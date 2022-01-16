@@ -5,8 +5,10 @@ from ..common.models.fcos import model
 from ..common.train import train
 
 dataloader.train.mapper.use_instance_mask = False
-optimizer.lr = 0.01
+dataloader.train.total_batch_size = 4
+optimizer.lr = 0.0025 #0.01
+
 
 model.backbone.bottom_up.freeze_at = 2
 train.init_checkpoint = "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
-train.output_dir = './output/fcos'
+train.output_dir = "./output/fcos_2gpu"
