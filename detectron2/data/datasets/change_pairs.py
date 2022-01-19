@@ -33,18 +33,20 @@ def get_change_pairs_dict(json_name):
 
         tmp_before = {
             'image': dicts['before'][i].pop('image'),
-            'annotations': [
-                {'bbox': dicts['before'][i].pop('bbox')},
-                {'bbox_mode':BoxMode.XYWH_ABS},
-            ],
-        }
+            'annotations': [{
+                'bbox': dicts['before'][i].pop('bbox'),
+                'bbox_mode':BoxMode.XYWH_ABS,
+                'category_id': dicts['before'][i].pop('category_id'),
+                }],
+            }
         tmp_after = {
             'image': dicts['after'][i].pop('image'),
-            'annotations': [
-                {'bbox': dicts['after'][i].pop('bbox')},
-                {'bbox_mode':BoxMode.XYWH_ABS},
-            ],
-        }
+            'annotations': [{
+                'bbox': dicts['after'][i].pop('bbox'),
+                'bbox_mode': BoxMode.XYWH_ABS,
+                'category_id': dicts['after'][i].pop('category_id'),
+                }],
+            }
         dicts_new.append({'before': tmp_before, 'after': tmp_after})
         # dicts['before'][i]['annotations'] = [
         #     {'bbox': dicts['before'][i].pop('bbox')},
@@ -61,4 +63,5 @@ def get_change_pairs_dict(json_name):
 
 
 DatasetCatalog.register('change_pairs', lambda: get_change_pairs_dict('/data1/zhonghaoxiang/dataset/OVIS/ovis_occlusion.json'))
+
 

@@ -172,7 +172,7 @@ class DatasetMapperChangePairs:
         self._transform_annotations(dataset_after, transforms_after, image_shape_after)
 
         dataset_dict = {}
-        keys = dataset_before.keys()
+        keys = list(dataset_before.keys())
         for k in keys:
             dataset_dict[k+"_before"]=dataset_before.pop(k)
             dataset_dict[k+"_after"]=dataset_after.pop(k)
