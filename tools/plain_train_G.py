@@ -120,7 +120,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
     checkpointer_det = DetectionCheckpointer(
         model_det, cfg_det.OUTPUT_DIR,
     )
-    checkpointer_det.load()
+    checkpointer_det.load(os.path.join(cfg_det.OUTPUT_DIR,'model_final.pth'))
 
     checkpointer = DetectionCheckpointer(
         model_g, cfg_g.OUTPUT_DIR, optimizer=optimizer, scheduler=scheduler
