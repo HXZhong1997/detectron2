@@ -635,3 +635,10 @@ _C.VIS_PERIOD = 0
 # Do not commit any configs into it.
 _C.GLOBAL = CN()
 _C.GLOBAL.HACK = 1.0
+
+
+# ---------------------------------------------------------------------------- #
+# NetG Options
+# ---------------------------------------------------------------------------- #
+_C.NET_G.MASK_TYPE = 'icassp'
+_C.NET_G.IN_CHANNELS = 256
