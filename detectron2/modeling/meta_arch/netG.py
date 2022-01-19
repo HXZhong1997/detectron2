@@ -34,11 +34,11 @@ class NetG(nn.Module):
     def __init__(
         self,
         *,
-        in_channels: int,
-        mask_type: str,
-        pixel_mean: Tuple[float],
-        pixel_std: Tuple[float],
-        input_format: Optional[str] = None,
+        in_channels,
+        mask_type,
+        pixel_mean,
+        pixel_std,
+        input_format,
     ):
         """
         Args:
@@ -106,7 +106,7 @@ class NetG(nn.Module):
         return self.pixel_mean.device
 
 
-    def forward(self, batched_inputs: tuple(List[Dict[str, torch.Tensor]]), faster_rcnn: nn.Module = None):
+    def forward(self, batched_inputs, faster_rcnn=None):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
