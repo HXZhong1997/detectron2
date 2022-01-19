@@ -50,6 +50,7 @@ from detectron2.modeling import build_model
 from detectron2.solver import build_lr_scheduler, build_optimizer
 from detectron2.utils.events import EventStorage
 
+from detectron2.data.dataset_mapper_pairs import DatasetMapperChangePairs
 logger = logging.getLogger("detectron2")
 
 
@@ -144,7 +145,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
         for data, iteration in zip(data_loader, range(start_iter, max_iter)):
             storage.iter = iteration
 
-            loss_dict = model_g(data)
+            loss_dict = model_g(data, model_det)
             losses = sum(loss_dict.values())
             assert torch.isfinite(losses).all(), loss_dict
 
