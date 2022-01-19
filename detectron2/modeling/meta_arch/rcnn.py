@@ -144,7 +144,8 @@ class GeneralizedRCNN(nn.Module):
         """
         if not self.training:
             return self.inference(batched_inputs)
-
+        #from IPython import embed
+        #embed()
         images = self.preprocess_image(batched_inputs)
         if "instances" in batched_inputs[0]:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
@@ -159,6 +160,9 @@ class GeneralizedRCNN(nn.Module):
             assert "proposals" in batched_inputs[0]
             proposals = [x["proposals"].to(self.device) for x in batched_inputs]
             proposal_losses = {}
+        
+        from IPython import embed
+        embed()
 
         _, detector_losses = self.roi_heads(images, features, proposals, gt_instances)
         if self.vis_period > 0:

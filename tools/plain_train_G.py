@@ -20,7 +20,7 @@ It also includes fewer abstraction, therefore is easier to add custom logic.
 """
 
 import logging
-import os
+import os,sys
 from collections import OrderedDict
 import torch, argparse
 from torch.nn.parallel import DistributedDataParallel
@@ -120,7 +120,6 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
     checkpointer_det = DetectionCheckpointer(
         model_det, cfg_det.OUTPUT_DIR,
     )
-
     checkpointer_det.load()
 
     checkpointer = DetectionCheckpointer(
@@ -214,7 +213,7 @@ def main(args):
             model_g, device_ids=[comm.get_local_rank()], broadcast_buffers=False
         )
 
-    do_train(cfg_g, model_g, model_det, resume=args.resume)
+    do_train(cfg_g, model_g, cfg_det, model_det, resume=args.resume)
     return 
 
 def my_argument_parser(epilog=None):

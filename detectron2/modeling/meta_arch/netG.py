@@ -144,7 +144,7 @@ class NetG(nn.Module):
             storage.put_image(vis_name, vis_img)
             break  # only visualize one image in a batch
 
-    def forward(self, batched_inputs: tuple(List[Dict[str, torch.Tensor]]), faster_rcnn: nn.Module = None):
+    def forward(self, batched_inputs, faster_rcnn = None):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
