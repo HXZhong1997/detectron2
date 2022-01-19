@@ -11,7 +11,7 @@ from detectron2.structures import BoxMode
 from detectron2.utils.file_io import PathManager
 
 
-__all__ = ["load_voc_instances", "register_pascal_voc"]
+__all__ = ["get_change_pairs_dict"]
 
 def get_change_pairs_dict(json_name):
     """

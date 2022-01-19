@@ -183,7 +183,7 @@ def setup(args):
     """
     cfg_det = get_cfg()
     cfg_det.merge_from_file(args.config_det)
-    cfg_det.merge_from_list(args.opts)
+    # cfg_det.merge_from_list()
     cfg_det.freeze()
 
     cfg_g = get_cfg()
