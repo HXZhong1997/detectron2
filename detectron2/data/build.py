@@ -239,6 +239,10 @@ def get_detection_dataset_dicts(
         names = [names]
     assert len(names), names
     dataset_dicts = [DatasetCatalog.get(dataset_name) for dataset_name in names]
+    
+    if len(names)==1 and names[0] == 'change_pairs':
+        return dataset_dicts[0]
+
     for dataset_name, dicts in zip(names, dataset_dicts):
         assert len(dicts), "Dataset '{}' is empty!".format(dataset_name)
 
@@ -421,7 +425,8 @@ def build_detection_train_loader(
         dataset = DatasetFromList(dataset, copy=False)
     if mapper is not None:
         dataset = MapDataset(dataset, mapper)
-
+    from IPython import embed
+    embed()
     if isinstance(dataset, torchdata.IterableDataset):
         assert sampler is None, "sampler must be None if dataset is IterableDataset"
     else:

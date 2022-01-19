@@ -50,6 +50,8 @@ from detectron2.modeling import build_model
 from detectron2.solver import build_lr_scheduler, build_optimizer
 from detectron2.utils.events import EventStorage
 
+from detectron2.data.dataset_mapper_pairs import DatasetMapperChangePairs
+
 logger = logging.getLogger("detectron2")
 
 
@@ -138,13 +140,13 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
 
     # compared to "train_net.py", we do not support accurate timing and
     # precise BN here, because they are not trivial to implement in a small training loop
-    data_loader = build_detection_train_loader(cfg_g)
+    data_loader = build_detection_train_loader(cfg_g, mapper=DatasetMapperChangePairs(cfg_g,is_train=True))
     logger.info("Starting training from iteration {}".format(start_iter))
     with EventStorage(start_iter) as storage:
         for data, iteration in zip(data_loader, range(start_iter, max_iter)):
             storage.iter = iteration
 
-            loss_dict = model_g(data)
+            loss_dict = model_g(data, model_det)
             losses = sum(loss_dict.values())
             assert torch.isfinite(losses).all(), loss_dict
 
