@@ -150,6 +150,8 @@ class DatasetMapperChangePairs:
         """
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # USER: Write your own image loading if it's not from a file
+        #print(type(dataset_dict))
+        #print(dataset_dict[0])
         dataset_before = dataset_dict['before']
         dataset_after = dataset_dict['after']
         image_before = utils.read_image(dataset_before["image"], format=self.image_format)

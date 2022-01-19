@@ -5,6 +5,8 @@ from typing import Dict, List, Optional, Tuple
 import torch
 from torch import nn
 
+
+import detectron2.utils.comm as comm
 from detectron2.config import configurable
 from detectron2.data.detection_utils import convert_image_to_rgb
 from detectron2.modeling.roi_heads import fast_rcnn
@@ -137,6 +139,9 @@ class NetG(nn.Module):
             return mask_ret
         
         assert faster_rcnn is not None
+        distributed = comm.get_world_size() > 1
+        if distributed:
+            faster_rcnn = faster_rcnn.module
         faster_rcnn.eval()
 
         images_before, images_after = self.preprocess_image(batched_inputs, faster_rcnn.backbone.size_divisibility)
@@ -156,7 +161,7 @@ class NetG(nn.Module):
             with torch.no_grad():
                 features = [feats[f] for f in faster_rcnn.roi_heads.box_in_features]
                 box_features = faster_rcnn.roi_heads.box_pooler(features, [x.gt_boxes for x in gt])
-                box_features = faster_rcnn.roi_heads.box_head(box_features)
+                # box_features = faster_rcnn.roi_heads.box_head(box_features)
             return box_features
         
         box_feats_before = _get_box_feats(faster_rcnn, feats_before, gt_instances_before) # tensor, proposal_num * channel * w * h (n*256*7*7)  

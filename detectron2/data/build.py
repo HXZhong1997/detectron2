@@ -241,7 +241,7 @@ def get_detection_dataset_dicts(
     dataset_dicts = [DatasetCatalog.get(dataset_name) for dataset_name in names]
 
     if len(names)==1 and names[0] == 'change_pairs':
-        return dataset_dicts
+        return dataset_dicts[0]
         
     for dataset_name, dicts in zip(names, dataset_dicts):
         assert len(dicts), "Dataset '{}' is empty!".format(dataset_name)
