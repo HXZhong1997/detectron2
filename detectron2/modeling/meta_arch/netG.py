@@ -39,17 +39,17 @@ class NetG(nn.Module):
         pixel_mean: Tuple[float],
         pixel_std: Tuple[float],
         input_format: Optional[str] = None,
-        vis_period: int = 0,
     ):
         """
         Args:
+            in_channels:
             backbone: a backbone module, must follow detectron2's backbone interface
             proposal_generator: a module that generates proposals using backbone features
             roi_heads: a ROI head that performs per-region computation
             pixel_mean, pixel_std: list or tuple with #channels element, representing
                 the per-channel mean and std to be used to normalize the input image
             input_format: describe the meaning of channels of input. Needed by visualization
-            vis_period: the period to run visualization. Set to 0 to disable.
+            
         """
         super().__init__()
         self.netG = nn.Sequential(
@@ -83,10 +83,7 @@ class NetG(nn.Module):
         self.mask_type = mask_type
 
         self.input_format = input_format
-        self.vis_period = vis_period
-        if vis_period > 0:
-            assert input_format is not None, "input_format is required for visualization!"
-
+        
         self.register_buffer("pixel_mean", torch.tensor(pixel_mean).view(-1, 1, 1), False)
         self.register_buffer("pixel_std", torch.tensor(pixel_std).view(-1, 1, 1), False)
         assert (
@@ -100,7 +97,6 @@ class NetG(nn.Module):
             "in_channels": cfg.NET_G.IN_CHANNELS,
             "mask_type": cfg.NET_G.MASK_TYPE,
             "input_format": cfg.INPUT.FORMAT,
-            "vis_period": cfg.VIS_PERIOD,
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
         }
@@ -109,42 +105,8 @@ class NetG(nn.Module):
     def device(self):
         return self.pixel_mean.device
 
-    def visualize_training(self, batched_inputs, proposals):
-        """
-        A function used to visualize images and proposals. It shows ground truth
-        bounding boxes on the original image and up to 20 top-scoring predicted
-        object proposals on the original image. Users can implement different
-        visualization functions for different models.
 
-        Args:
-            batched_inputs (list): a list that contains input to the model.
-            proposals (list): a list that contains predicted proposals. Both
-                batched_inputs and proposals should have the same length.
-        """
-        from detectron2.utils.visualizer import Visualizer
-
-        storage = get_event_storage()
-        max_vis_prop = 20
-
-        for input, prop in zip(batched_inputs, proposals):
-            img = input["image"]
-            img = convert_image_to_rgb(img.permute(1, 2, 0), self.input_format)
-            v_gt = Visualizer(img, None)
-            v_gt = v_gt.overlay_instances(boxes=input["instances"].gt_boxes)
-            anno_img = v_gt.get_image()
-            box_size = min(len(prop.proposal_boxes), max_vis_prop)
-            v_pred = Visualizer(img, None)
-            v_pred = v_pred.overlay_instances(
-                boxes=prop.proposal_boxes[0:box_size].tensor.cpu().numpy()
-            )
-            prop_img = v_pred.get_image()
-            vis_img = np.concatenate((anno_img, prop_img), axis=1)
-            vis_img = vis_img.transpose(2, 0, 1)
-            vis_name = "Left: GT bounding boxes;  Right: Predicted proposals"
-            storage.put_image(vis_name, vis_img)
-            break  # only visualize one image in a batch
-
-    def forward(self, batched_inputs, faster_rcnn = None):
+    def forward(self, batched_inputs: tuple(List[Dict[str, torch.Tensor]]), faster_rcnn: nn.Module = None):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
@@ -177,7 +139,7 @@ class NetG(nn.Module):
         assert faster_rcnn is not None
         faster_rcnn.eval()
 
-        images_before, images_after = self.preprocess_image(batched_inputs)
+        images_before, images_after = self.preprocess_image(batched_inputs, faster_rcnn.backbone.size_divisibility)
 
         # infer roi feature with faster-rcnn
         with torch.no_grad():
@@ -224,18 +186,17 @@ class NetG(nn.Module):
         return losses
 
     
-
-    def preprocess_image(self, batched_inputs: List[Dict[str, torch.Tensor]]):
+    def preprocess_image(self, batched_inputs: List[Dict[str, torch.Tensor]], size_divisibility):
         """
         Normalize, pad and batch the input images.
         """
         images_before = [x["image_before"].to(self.device) for x in batched_inputs]
         images_before = [(x - self.pixel_mean) / self.pixel_std for x in images_before]
-        images_before = ImageList.from_tensors(images_before, self.backbone.size_divisibility)
+        images_before = ImageList.from_tensors(images_before, size_divisibility)
 
         images_after = [x["image_before"].to(self.device) for x in batched_inputs]
         images_after = [(x - self.pixel_mean) / self.pixel_std for x in images_after]
-        images_after = ImageList.from_tensors(images_after, self.backbone.size_divisibility)
+        images_after = ImageList.from_tensors(images_after, size_divisibility)
         return images_before, images_after
 
 
