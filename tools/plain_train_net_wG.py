@@ -139,7 +139,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
 
     # compared to "train_net.py", we do not support accurate timing and
     # precise BN here, because they are not trivial to implement in a small training loop
-    data_loader = build_detection_train_loader(cfg_det, mapper=DatasetMapperChangePairs(cfg_det,is_train=True))
+    data_loader = build_detection_train_loader(cfg_det)
     logger.info("Starting training from iteration {}".format(start_iter))
     with EventStorage(start_iter) as storage:
         for data, iteration in zip(data_loader, range(start_iter, max_iter)):
@@ -187,15 +187,16 @@ def setup(args):
     """
     cfg_det = get_cfg()
     cfg_det.merge_from_file(args.config_det)
-    # cfg_det.merge_from_list()
+    cfg_det.merge_from_list(args.opts)
     cfg_det.freeze()
 
     cfg_g = get_cfg()
     cfg_g.merge_from_file(args.config_file)
-    cfg_g.merge_from_list(args.opts)
+    #cfg_g.merge_from_list(args.opts)
     cfg_g.freeze()
+
     default_setup(
-        cfg_g, args
+        cfg_det, args
     )  # if you don't like any of the default setup, write your own setup code
     return cfg_det, cfg_g
 

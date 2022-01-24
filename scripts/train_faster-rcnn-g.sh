@@ -1,0 +1,2 @@
+python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2.yaml --config-det configs/faster-rcnn-g/faster_rcnn_R_50_FPN_1x.yaml --num-gpus 2 OUTPUT_DIR output/faster-rcnn-glr1e_2-i50  NET_G.INTERVAL 50
+python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2.yaml --config-det configs/faster-rcnn-g/faster_rcnn_R_50_FPN_1x.yaml --num-gpus 2 OUTPUT_DIR output/faster-rcnn-glr1e_2-i100  NET_G.INTERVAL 100

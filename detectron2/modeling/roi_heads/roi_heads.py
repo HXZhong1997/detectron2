@@ -554,6 +554,7 @@ class StandardROIHeads_NetG(ROIHeads):
         keypoint_pooler: Optional[ROIPooler] = None,
         keypoint_head: Optional[nn.Module] = None,
         train_on_pred_boxes: bool = False,
+        mask_type: Optional[str] = 'icassp',
         **kwargs,
     ):
         """
@@ -596,6 +597,7 @@ class StandardROIHeads_NetG(ROIHeads):
             self.keypoint_head = keypoint_head
 
         self.train_on_pred_boxes = train_on_pred_boxes
+        self.mask_type = mask_type
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -612,6 +614,7 @@ class StandardROIHeads_NetG(ROIHeads):
             ret.update(cls._init_mask_head(cfg, input_shape))
         if inspect.ismethod(cls._init_keypoint_head):
             ret.update(cls._init_keypoint_head(cfg, input_shape))
+        ret["mask_type"]=cfg.NET_G.MASK_TYPE
         return ret
 
     @classmethod
@@ -800,9 +803,9 @@ class StandardROIHeads_NetG(ROIHeads):
         if self.training and netG is not None:
             with torch.no_grad():
                 mask = netG(box_features)
-            if netG.mask_type == 'icassp':
+            if self.mask_type == 'icassp':
                 box_features_g = box_features*mask
-            elif netG.mask_type == 'residual':
+            elif self.mask_type == 'residual':
                 box_features_g = box_features+mask
             else:
                 raise NotImplementedError

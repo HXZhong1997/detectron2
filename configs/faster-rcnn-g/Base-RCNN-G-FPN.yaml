@@ -19,7 +19,7 @@ MODEL:
     POST_NMS_TOPK_TRAIN: 1000
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
-    NAME: "StandardROIHeads"
+    NAME: "StandardROIHeads_NetG"
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
   ROI_BOX_HEAD:
     NAME: "FastRCNNConvFCHead"

@@ -62,6 +62,6 @@ def get_change_pairs_dict(json_name):
     return dicts_new
 
 
-DatasetCatalog.register('change_pairs', lambda: get_change_pairs_dict('/data1/zhonghaoxiang/dataset/OVIS/ovis_occlusion.json'))
+DatasetCatalog.register('change_pairs', lambda: get_change_pairs_dict('/data/zhonghaoxiang/dataset/OVIS/ovis_occlusion.json'))
 
 

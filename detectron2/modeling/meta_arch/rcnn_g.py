@@ -161,9 +161,6 @@ class GeneralizedRCNN_NetG(nn.Module):
             proposals = [x["proposals"].to(self.device) for x in batched_inputs]
             proposal_losses = {}
         
-        from IPython import embed
-        embed()
-
         _, detector_losses = self.roi_heads(images, features, proposals, gt_instances, netG)
         if self.vis_period > 0:
             storage = get_event_storage()
