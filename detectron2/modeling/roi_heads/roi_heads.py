@@ -1174,7 +1174,7 @@ class StandardROIHeads(ROIHeads):
         box_features = self.box_head(box_features)
         predictions = self.box_predictor(box_features)
         del box_features
-
+        
         if self.training:
             losses = self.box_predictor.losses(predictions, proposals)
             # proposals is modified in-place below, so losses must be computed first.

@@ -121,14 +121,14 @@ def do_update_g(model_det, model_g, cfg_det, data):
         if distributed:
             images = model_det.module.preprocess_image(data)
             with torch.no_grad():
-                features = model_det.module.backbone(images.tensors)
+                features = model_det.module.backbone(images.tensor)
                 proposals, _ = model_det.module.proposal_generator(images, features, None)
                 features = [features[f] for f in model_det.module.roi_heads.box_in_features]
                 box_features = model_det.module.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
         else:
             images = model_det.preprocess_image(data)
             with torch.no_grad():
-                features = model_det.backbone(images.tensors)
+                features = model_det.backbone(images.tensor)
                 proposals, _ = model_det.proposal_generator(images, features, None)
                 features = [features[f] for f in model_det.roi_heads.box_in_features]
                 box_features = model_det.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
@@ -140,6 +140,7 @@ def do_update_g(model_det, model_g, cfg_det, data):
         #random perturbation on mask
         masks_pert=[]
         max_scores=[]
+        num_instances=[]
         num_drop = int (mask.numel()/mask.size(0) * cfg_det.NET_G.DROP)
         
         for i in range(9):
@@ -166,11 +167,12 @@ def do_update_g(model_det, model_g, cfg_det, data):
                     pred_instances = model_det.module.roi_heads.box_predictor.inference(predictions,proposals)
                 else:
                     box_features_ = model_det.roi_heads.box_head(box_features_)
-                    predictions = model_det.roi_heads.box_predictor(box_features)
+                    predictions = model_det.roi_heads.box_predictor(box_features_)
                     pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
+                num_instance = [it.num_instances for it in pred_instances[0]]
+                    
+                scores = [it.scores.max() for it in pred_instances[0]] #batchsize * 1
             
-            scores = [it.scores.max() for it in pred_instances] #batchsize * 1
-
             max_scores.append(scores)
             masks_pert.append(mask_)
 
@@ -262,7 +264,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
                 #TODO: update netG
                 model_det.eval()
                 model_g.train()
-                loss_dict_g = do_update_g(model_det,model_g)
+                loss_dict_g = do_update_g(model_det,model_g,cfg_det,data)
                 losses = sum(loss_dict_g.values())
 
                 assert torch.isfinite(losses).all(), loss_dict
