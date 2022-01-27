@@ -169,9 +169,13 @@ def do_update_g(model_det, model_g, cfg_det, data):
                     box_features_ = model_det.roi_heads.box_head(box_features_)
                     predictions = model_det.roi_heads.box_predictor(box_features_)
                     pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
-                num_instance = [it.num_instances for it in pred_instances[0]]
-                    
-                scores = [it.scores.max() for it in pred_instances[0]] #batchsize * 1
+                
+                scores=[]
+                for it in pred_instances[0]:
+                    if it.num_instances == 0:
+                        scores.append(torch.tensor(0,device=box_features_.device,dtype=box_features_.dtype))
+                        continue
+                    scores.append(it.scores.max()) #batchsize * 1
             
             max_scores.append(scores)
             masks_pert.append(mask_)
@@ -262,12 +266,13 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
                 cfg_det.NET_G.UPDATE_MODE != 'no'
             ):
                 #TODO: update netG
+                logger.info('Start Updating Net-G')
                 model_det.eval()
                 model_g.train()
                 loss_dict_g = do_update_g(model_det,model_g,cfg_det,data)
                 losses = sum(loss_dict_g.values())
 
-                assert torch.isfinite(losses).all(), loss_dict
+                assert torch.isfinite(losses).all(), loss_dict_g
 
                 loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict_g).items()}
                 losses_reduced = sum(loss for loss in loss_dict_reduced.values())
@@ -279,6 +284,8 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
                 optimizer_g.step()
                 scheduler_g.step()
                 
+                model_g.eval()
+                model_det.train()
 
             if (
                 iteration > cfg_det.NET_G.START_ITER and 
@@ -345,7 +352,7 @@ def main(args):
     logger.info("Detector Model:\n{}".format(model_det))
 
     model_g = build_model(cfg_g)
-    logger.info("Detector Model:\n{}".format(model_g))
+    logger.info("Net-G Model:\n{}".format(model_g))
     
     distributed = comm.get_world_size() > 1
     if distributed:
