@@ -1,0 +1,10 @@
+_BASE_: "Base-RCNN-G-FPN.yaml"
+MODEL:
+  WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+  MASK_ON: False
+  RESNETS:
+    DEPTH: 50
+NET_G:
+  UPDATE_MODE: 'icassp'
+  UPDATE_INTERVAL: 200
+  

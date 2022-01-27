@@ -19,10 +19,15 @@ Compared to "train_net.py", this script supports fewer default features.
 It also includes fewer abstraction, therefore is easier to add custom logic.
 """
 
+from dataclasses import dataclass
 import logging
 import os,sys
+import numpy as np
+import random
+from pyexpat import features
 from collections import OrderedDict
 import torch, argparse
+import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel
 
 import detectron2.utils.comm as comm
@@ -110,6 +115,103 @@ def do_test(cfg, model):
         results = list(results.values())[0]
     return results
 
+def do_update_g(model_det, model_g, cfg_det, data):
+        distributed = comm.get_world_size() > 1
+
+        if distributed:
+            images = model_det.module.preprocess_image(data)
+            with torch.no_grad():
+                features = model_det.module.backbone(images.tensors)
+                proposals, _ = model_det.module.proposal_generator(images, features, None)
+                features = [features[f] for f in model_det.module.roi_heads.box_in_features]
+                box_features = model_det.module.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
+        else:
+            images = model_det.preprocess_image(data)
+            with torch.no_grad():
+                features = model_det.backbone(images.tensors)
+                proposals, _ = model_det.proposal_generator(images, features, None)
+                features = [features[f] for f in model_det.roi_heads.box_in_features]
+                box_features = model_det.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
+
+        model_g.eval()
+        with torch.no_grad():
+            mask = model_g(box_features)
+        
+        #random perturbation on mask
+        masks_pert=[]
+        max_scores=[]
+        num_drop = int (mask.numel()/mask.size(0) * cfg_det.NET_G.DROP)
+        
+        for i in range(9):
+            drop_idxes = list(range(int(mask.numel()/mask.size(0))))
+            random.shuffle(drop_idxes)
+            drop_idxes = drop_idxes[:num_drop]
+            c_idx,x_idx,y_idx = np.unravel_index(drop_idxes,mask[0].shape)
+
+            #embed()
+            mask_ = mask.clone()
+            mask_[:,c_idx,x_idx,y_idx] = 0
+
+            with torch.no_grad():
+                if cfg_det.NET_G.MASK_TYPE == 'icassp':
+                    box_features_ = box_features * mask_
+                elif cfg_det.NET_G.MASK_TYPE == 'residual':
+                    box_features_ = box_features + mask_
+                else:
+                    raise NotImplementedError
+                
+                if distributed:
+                    box_features_ = model_det.module.roi_heads.box_head(box_features_)
+                    predictions = model_det.module.roi_heads.box_predictor(box_features_)
+                    pred_instances = model_det.module.roi_heads.box_predictor.inference(predictions,proposals)
+                else:
+                    box_features_ = model_det.roi_heads.box_head(box_features_)
+                    predictions = model_det.roi_heads.box_predictor(box_features)
+                    pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
+            
+            scores = [it.scores.max() for it in pred_instances] #batchsize * 1
+
+            max_scores.append(scores)
+            masks_pert.append(mask_)
+
+        #TODO: select target mask and update netG
+        def select_mask(max_scores):
+            '''
+                max_scores: list(np.array(batchsize,1))        
+            '''
+            if cfg_det.NET_G.UPDATE_MODE == 'icassp' or cfg_det.NET_G.UPDATE_MODE == 'minmax':
+                max_scores = [np.max(it) for it in max_scores]
+                return np.argmin(max_scores)
+            elif cfg_det.NET_G.UPDATE_MODE == 'minmin':
+                min_score = [np.min(it) for it in max_scores]
+                return np.argmin(min_score)
+            elif cfg_det.NET_G.UPDATE_MODE == 'minmean':
+                mean_score = [np.mean(it) for it in max_scores]
+                return np.argmin(mean_score)
+            elif cfg_det.NET_G.UPDATE_MODE == 'confuse':
+                confuse = [np.abs(it-0.5).mean() for it in max_scores]
+                return np.argmin(confuse)
+            else:
+                raise NotImplementedError
+
+        idx = select_mask(max_scores)
+        mask_tar = masks_pert[idx]
+
+        del masks_pert, max_scores
+
+        # 'Updating net G ...'
+        model_g.train(True)
+
+        with torch.enable_grad():
+            if distributed:
+                mask_pre = model_g.module.netG(box_features)
+            else:
+                mask_pre = model_g.netG(box_features)
+        loss = nn.L1Loss()(mask_pre,mask_tar)
+
+        return {'loss_g':loss}
+        
+
 
 def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
     model_det.train()
@@ -117,6 +219,13 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
 
     optimizer = build_optimizer(cfg_det, model_det)
     scheduler = build_lr_scheduler(cfg_det, optimizer)
+
+    optimizer_g = build_optimizer(cfg_g, model_g)
+    scheduler_g = torch.optim.lr_scheduler.StepLR(
+        optimizer_g,
+        step_size= int(((cfg_det.SOLVER.MAX_ITER - cfg_det.NET_G.UPDATE_START)/cfg_det.NET_G.UPDATE_INTERVAL)*0.5),
+        gamma=0.1
+        )
 
     checkpointer_g = DetectionCheckpointer(
         model_g, cfg_g.OUTPUT_DIR,
@@ -144,13 +253,39 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
     with EventStorage(start_iter) as storage:
         for data, iteration in zip(data_loader, range(start_iter, max_iter)):
             storage.iter = iteration
-            if iteration > cfg_det.NET_G.START_ITER and (iteration + 1)%cfg_det.NET_G.INTERVAL == 0:
+
+            if (
+                iteration > cfg_det.NET_G.UPDATE_START and 
+                (iteration + 1)%cfg_det.NET_G.UPDATE_INTERVAL==0 and
+                cfg_det.NET_G.UPDATE_MODE != 'no'
+            ):
+                #TODO: update netG
+                model_det.eval()
+                model_g.train()
+                loss_dict_g = do_update_g(model_det,model_g)
+                losses = sum(loss_dict_g.values())
+
+                assert torch.isfinite(losses).all(), loss_dict
+
+                loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict_g).items()}
+                losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+                if comm.is_main_process():
+                    storage.put_scalars(total_loss=losses_reduced, **loss_dict_reduced)
+
+                optimizer_g.zero_grad()
+                losses.backward()
+                optimizer_g.step()
+                scheduler_g.step()
+                
+
+            if (
+                iteration > cfg_det.NET_G.START_ITER and 
+                (iteration + 1)%cfg_det.NET_G.INTERVAL == 0
+            ):
                 loss_dict = model_det(data, model_g)
             else:
                 loss_dict = model_det(data)
-            if iteration > cfg_det.NET_G.UPDATE_START and (iteration + 1)%cfg_det.NET_G.UPDATE_INTERVAL==0:
-                #TODO: update netG
-                pass
+
             losses = sum(loss_dict.values())
             assert torch.isfinite(losses).all(), loss_dict
 
