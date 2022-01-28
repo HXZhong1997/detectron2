@@ -175,8 +175,11 @@ def do_update_g(model_det, model_g, cfg_det, data):
                 for it in pred_instances[0]:
                     if len(it.scores) == 0: #TODO: no such field
                         scores.append(torch.tensor(0,dtype=box_features_.dtype))
-                        continue
-                    scores.append(it.scores.max().cpu()) #batchsize * 1
+                    elif cfg_det.NET_G.UPDATE_MODE=='confuse':
+                        idx = torch.argmin(torch.abs(it.scores-0.5))
+                        scores.append(it.scores[idx].cpu())
+                    else:
+                        scores.append(it.scores.max().cpu()) #batchsize * 1
             
             max_scores.append(scores)
             masks_pert.append(mask_)
