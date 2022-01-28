@@ -199,7 +199,7 @@ def do_update_g(model_det, model_g, cfg_det, data):
                 mean_score = [np.mean(it) for it in max_scores]
                 return np.argmin(mean_score)
             elif cfg_det.NET_G.UPDATE_MODE == 'confuse':
-                confuse = [np.abs(it-0.5).mean() for it in max_scores]
+                confuse = [np.abs(np.array(it)-0.5).mean() for it in max_scores]
                 return np.argmin(confuse)
             else:
                 raise NotImplementedError
