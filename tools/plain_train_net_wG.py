@@ -21,7 +21,7 @@ It also includes fewer abstraction, therefore is easier to add custom logic.
 
 from dataclasses import dataclass
 import logging
-import os,sys
+import os,sys,time
 import numpy as np
 import random
 from pyexpat import features
@@ -171,11 +171,12 @@ def do_update_g(model_det, model_g, cfg_det, data):
                     pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
                 
                 scores=[]
+
                 for it in pred_instances[0]:
-                    if it.num_instances == 0:
-                        scores.append(torch.tensor(0,device=box_features_.device,dtype=box_features_.dtype))
+                    if len(it.scores) == 0: #TODO: no such field
+                        scores.append(torch.tensor(0,dtype=box_features_.dtype))
                         continue
-                    scores.append(it.scores.max()) #batchsize * 1
+                    scores.append(it.scores.max().cpu()) #batchsize * 1
             
             max_scores.append(scores)
             masks_pert.append(mask_)
@@ -266,7 +267,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
                 cfg_det.NET_G.UPDATE_MODE != 'no'
             ):
                 #TODO: update netG
-                logger.info('Start Updating Net-G')
+                tic = time.time()
                 model_det.eval()
                 model_g.train()
                 loss_dict_g = do_update_g(model_det,model_g,cfg_det,data)
@@ -286,7 +287,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
                 
                 model_g.eval()
                 model_det.train()
-
+                logger.info('Net-G Updated at iter {}   loss_g: {:.4f}   sec: {:.5f}'.format(iteration, loss_dict_reduced['loss_g'], time.time()-tic))
             if (
                 iteration > cfg_det.NET_G.START_ITER and 
                 (iteration + 1)%cfg_det.NET_G.INTERVAL == 0
