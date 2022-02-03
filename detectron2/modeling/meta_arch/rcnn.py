@@ -161,8 +161,8 @@ class GeneralizedRCNN(nn.Module):
             proposals = [x["proposals"].to(self.device) for x in batched_inputs]
             proposal_losses = {}
         
-        from IPython import embed
-        embed()
+        #from IPython import embed
+        #embed()
 
         _, detector_losses = self.roi_heads(images, features, proposals, gt_instances)
         if self.vis_period > 0:
