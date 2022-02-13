@@ -269,28 +269,29 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
                 (iteration + 1)%cfg_det.NET_G.UPDATE_INTERVAL==0 and
                 cfg_det.NET_G.UPDATE_MODE != 'no'
             ):
+                for i in range(cfg_det.NET_G.UPDATE_TIMES):
                 #TODO: update netG
-                tic = time.time()
-                model_det.eval()
-                model_g.train()
-                loss_dict_g = do_update_g(model_det,model_g,cfg_det,data)
-                losses = sum(loss_dict_g.values())
+                    tic = time.time()
+                    model_det.eval()
+                    model_g.train()
+                    loss_dict_g = do_update_g(model_det,model_g,cfg_det,data)
+                    losses = sum(loss_dict_g.values())
 
-                assert torch.isfinite(losses).all(), loss_dict_g
+                    assert torch.isfinite(losses).all(), loss_dict_g
 
-                loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict_g).items()}
-                losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-                if comm.is_main_process():
-                    storage.put_scalars(total_loss=losses_reduced, **loss_dict_reduced)
+                    loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict_g).items()}
+                    losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+                    if comm.is_main_process():
+                        storage.put_scalars(total_loss=losses_reduced, **loss_dict_reduced)
 
-                optimizer_g.zero_grad()
-                losses.backward()
-                optimizer_g.step()
-                scheduler_g.step()
+                    optimizer_g.zero_grad()
+                    losses.backward()
+                    optimizer_g.step()
+                    scheduler_g.step()
                 
-                model_g.eval()
-                model_det.train()
-                logger.info('Net-G Updated at iter {}   loss_g: {:.4f}   sec: {:.5f}'.format(iteration, loss_dict_reduced['loss_g'], time.time()-tic))
+                    model_g.eval()
+                    model_det.train()
+                    logger.info('Net-G Updated at iter {}  #{}  loss_g: {:.4f}   sec: {:.5f}'.format(iteration, i, loss_dict_reduced['loss_g'], time.time()-tic))
             if (
                 iteration > cfg_det.NET_G.START_ITER and 
                 (iteration + 1)%cfg_det.NET_G.INTERVAL == 0
