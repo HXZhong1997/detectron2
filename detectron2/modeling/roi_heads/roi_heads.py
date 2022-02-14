@@ -555,6 +555,7 @@ class StandardROIHeads_NetG(ROIHeads):
         keypoint_head: Optional[nn.Module] = None,
         train_on_pred_boxes: bool = False,
         mask_type: Optional[str] = 'icassp',
+        only_g: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -598,6 +599,8 @@ class StandardROIHeads_NetG(ROIHeads):
 
         self.train_on_pred_boxes = train_on_pred_boxes
         self.mask_type = mask_type
+        self.only_g = only_g
+
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -615,6 +618,7 @@ class StandardROIHeads_NetG(ROIHeads):
         if inspect.ismethod(cls._init_keypoint_head):
             ret.update(cls._init_keypoint_head(cfg, input_shape))
         ret["mask_type"]=cfg.NET_G.MASK_TYPE
+        ret["only_g"] = cfg.NET_G.ONLY_G
         return ret
 
     @classmethod
@@ -781,7 +785,7 @@ class StandardROIHeads_NetG(ROIHeads):
         instances = self._forward_keypoint(features, instances)
         return instances
 
-    def _forward_box(self, features: Dict[str, torch.Tensor], proposals: List[Instances], netG: nn.Module = None,):
+    def _forward_box(self, features: Dict[str, torch.Tensor], proposals: List[Instances], netG: nn.Module = None, mask: torch.Tensor=None):
         """
         Forward logic of the box prediction branch. If `self.train_on_pred_boxes is True`,
             the function puts predicted boxes in the `proposal_boxes` field of `proposals` argument.
@@ -800,9 +804,11 @@ class StandardROIHeads_NetG(ROIHeads):
         """
         features = [features[f] for f in self.box_in_features]
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
+
         if self.training and netG is not None:
-            with torch.no_grad():
-                mask = netG(box_features)
+            if mask is None:
+                with torch.no_grad():
+                    mask = netG(box_features)
             if self.mask_type == 'icassp':
                 box_features_g = box_features*mask
             elif self.mask_type == 'residual':
@@ -821,10 +827,12 @@ class StandardROIHeads_NetG(ROIHeads):
         if self.training:
             losses = self.box_predictor.losses(predictions, proposals)
             if netG is not None:
-                losses_g = self.box_predictor.losses(predictions, proposals)
+                losses_g = self.box_predictor.losses(predictions_g, proposals)
                 for k in list(losses_g.keys()):
                     losses_g[k+'_g'] = losses_g.pop(k)
-                losses.update(losses_g)                
+                losses.update(losses_g)
+                if self.only_g:
+                    return losses_g
             
             # proposals is modified in-place below, so losses must be computed first.
             if self.train_on_pred_boxes:
