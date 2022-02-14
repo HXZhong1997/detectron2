@@ -733,6 +733,7 @@ class StandardROIHeads_NetG(ROIHeads):
         proposals: List[Instances],
         targets: Optional[List[Instances]] = None,
         netG: Optional[nn.Module] = None,
+        mask: Optional[torch.Tensor] = None,
     ) -> Tuple[List[Instances], Dict[str, torch.Tensor]]:
         """
         See :class:`ROIHeads.forward`.
@@ -744,7 +745,7 @@ class StandardROIHeads_NetG(ROIHeads):
         del targets
 
         if self.training:
-            losses = self._forward_box(features, proposals,netG)
+            losses = self._forward_box(features, proposals, netG, mask)
             # Usually the original proposals used by the box head are used by the mask, keypoint
             # heads. But when `self.train_on_pred_boxes is True`, proposals will contain boxes
             # predicted by the box head.

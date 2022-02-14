@@ -10,7 +10,7 @@
 
 #python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 2 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-ui25-mean2  NET_G.INTERVAL 25  NET_G.START_ITER 12000 NET_G.UPDATE_START 12000 NET_G.UPDATE_INTERVAL 25 NET_G.UPDATE_MODE 'minmean'
 
-python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 2 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-ui50-mean2  NET_G.INTERVAL 50  NET_G.START_ITER 12000 NET_G.UPDATE_START 12000 NET_G.UPDATE_INTERVAL 50 NET_G.UPDATE_MODE 'minmean'
+python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 2 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-ui50-icassp  NET_G.INTERVAL 50  NET_G.START_ITER 10000 NET_G.UPDATE_START 10000 NET_G.UPDATE_INTERVAL 50 NET_G.UPDATE_MODE 'icassp' NET_G.ONLY_G True 
 
 python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 2 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-i25-2  NET_G.INTERVAL 25  NET_G.START_ITER 12000
 

@@ -124,18 +124,20 @@ def do_update_g(model_det, model_g, cfg_det, data):
         if distributed:
             images = model_det.module.preprocess_image(data)
             with torch.no_grad():
-                features = model_det.module.backbone(images.tensor)
-                proposals, _ = model_det.module.proposal_generator(images, features, None)
-                features = [features[f] for f in model_det.module.roi_heads.box_in_features]
+                features_orig = model_det.module.backbone(images.tensor)
+                proposals, _ = model_det.module.proposal_generator(images, features_orig, None)
+                proposals = model_det.module.roi_heads.label_and_sample_proposals(proposals, gt_instances)
+                features = [features_orig[f] for f in model_det.module.roi_heads.box_in_features]
                 box_features = model_det.module.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
         else:
             images = model_det.preprocess_image(data)
             with torch.no_grad():
-                features = model_det.backbone(images.tensor)
-                proposals, _ = model_det.proposal_generator(images, features, None)
-                features = [features[f] for f in model_det.roi_heads.box_in_features]
+                features_orig = model_det.backbone(images.tensor)
+                proposals, _ = model_det.proposal_generator(images, features_orig, None)
+                proposals = model_det.roi_heads.label_and_sample_proposals(proposals, gt_instances)
+                features = [features_orig[f] for f in model_det.roi_heads.box_in_features]
                 box_features = model_det.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
-
+        
         model_g.eval()
         with torch.no_grad():
             mask = model_g(box_features)
@@ -160,9 +162,9 @@ def do_update_g(model_det, model_g, cfg_det, data):
                 if cfg_det.NET_G.UPDATE_MODE == 'icassp':
                     model_det.train()
                     if distributed:
-                        _, detector_loss_g = model_det.module.roi_heads(images,features,proposals,gt_instances,model_g,mask_)
+                        _, detector_loss_g = model_det.module.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
                     else:
-                        _, detector_loss_g = model_det.roi_heads(images,features,proposals,gt_instances,model_g,mask_)
+                        _, detector_loss_g = model_det.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
                     scores=sum(detector_loss_g.values()).cpu()
                     model_det.eval()
                 else: 
