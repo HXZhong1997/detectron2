@@ -117,7 +117,10 @@ def do_test(cfg, model):
 
 def do_update_g(model_det, model_g, cfg_det, data):
         distributed = comm.get_world_size() > 1
-
+        if "instances" in data[0]:
+            gt_instances = [x["instances"].to(model_det.device) for x in data]
+        else:
+            gt_instances = None
         if distributed:
             images = model_det.module.preprocess_image(data)
             with torch.no_grad():
@@ -154,32 +157,41 @@ def do_update_g(model_det, model_g, cfg_det, data):
             mask_[:,c_idx,x_idx,y_idx] = 0
 
             with torch.no_grad():
-                if cfg_det.NET_G.MASK_TYPE == 'icassp':
-                    box_features_ = box_features * mask_
-                elif cfg_det.NET_G.MASK_TYPE == 'residual':
-                    box_features_ = box_features + mask_
-                else:
-                    raise NotImplementedError
-                
-                if distributed:
-                    box_features_ = model_det.module.roi_heads.box_head(box_features_)
-                    predictions = model_det.module.roi_heads.box_predictor(box_features_)
-                    pred_instances = model_det.module.roi_heads.box_predictor.inference(predictions,proposals)
-                else:
-                    box_features_ = model_det.roi_heads.box_head(box_features_)
-                    predictions = model_det.roi_heads.box_predictor(box_features_)
-                    pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
-                
-                scores=[]
-
-                for it in pred_instances[0]:
-                    if len(it.scores) == 0: #TODO: no such field
-                        scores.append(torch.tensor(0,dtype=box_features_.dtype))
-                    elif cfg_det.NET_G.UPDATE_MODE=='confuse':
-                        idx = torch.argmin(torch.abs(it.scores-0.5))
-                        scores.append(it.scores[idx].cpu())
+                if cfg_det.NET_G.UPDATE_MODE == 'icassp':
+                    model_det.train()
+                    if distributed:
+                        _, detector_loss_g = model_det.module.roi_heads(images,features,proposals,gt_instances,model_g,mask_)
                     else:
-                        scores.append(it.scores.max().cpu()) #batchsize * 1
+                        _, detector_loss_g = model_det.roi_heads(images,features,proposals,gt_instances,model_g,mask_)
+                    scores=sum(detector_loss_g.values()).cpu()
+                    model_det.eval()
+                else: 
+                    if cfg_det.NET_G.MASK_TYPE == 'icassp':
+                        box_features_ = box_features * mask_
+                    elif cfg_det.NET_G.MASK_TYPE == 'residual':
+                        box_features_ = box_features + mask_
+                    else:
+                        raise NotImplementedError
+                    
+                    if distributed:
+                        box_features_ = model_det.module.roi_heads.box_head(box_features_)
+                        predictions = model_det.module.roi_heads.box_predictor(box_features_)
+                        pred_instances = model_det.module.roi_heads.box_predictor.inference(predictions,proposals)
+                    else:
+                        box_features_ = model_det.roi_heads.box_head(box_features_)
+                        predictions = model_det.roi_heads.box_predictor(box_features_)
+                        pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
+                    
+                    scores=[]
+
+                    for it in pred_instances[0]:
+                        if len(it.scores) == 0: #TODO: no such field
+                            scores.append(torch.tensor(0,dtype=box_features_.dtype))
+                        elif cfg_det.NET_G.UPDATE_MODE=='confuse':
+                            idx = torch.argmin(torch.abs(it.scores-0.5))
+                            scores.append(it.scores[idx].cpu())
+                        else:
+                            scores.append(it.scores.max().cpu()) #batchsize * 1
             
             max_scores.append(scores)
             masks_pert.append(mask_)
@@ -189,7 +201,9 @@ def do_update_g(model_det, model_g, cfg_det, data):
             '''
                 max_scores: list(np.array(batchsize,1))        
             '''
-            if cfg_det.NET_G.UPDATE_MODE == 'icassp' or cfg_det.NET_G.UPDATE_MODE == 'minmax':
+            if cfg_det.NET_G.UPDATE_MODE == 'icassp':
+                return np.argmax(max_scores)
+            elif cfg_det.NET_G.UPDATE_MODE == 'minmax':
                 max_scores = [np.max(it) for it in max_scores]
                 return np.argmin(max_scores)
             elif cfg_det.NET_G.UPDATE_MODE == 'minmin':
