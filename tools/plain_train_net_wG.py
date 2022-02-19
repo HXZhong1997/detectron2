@@ -141,7 +141,8 @@ def do_update_g(model_det, model_g, cfg_det, data):
         model_g.eval()
         with torch.no_grad():
             mask = model_g(box_features)
-        
+            if cfg_det.NET_G.MASK_CLIP:
+                mask[mask>1]=1 
         #random perturbation on mask
         masks_pert=[]
         max_scores=[]

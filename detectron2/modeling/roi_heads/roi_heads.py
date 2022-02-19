@@ -556,6 +556,7 @@ class StandardROIHeads_NetG(ROIHeads):
         train_on_pred_boxes: bool = False,
         mask_type: Optional[str] = 'icassp',
         only_g: Optional[bool] = False,
+        mask_clip: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -600,6 +601,7 @@ class StandardROIHeads_NetG(ROIHeads):
         self.train_on_pred_boxes = train_on_pred_boxes
         self.mask_type = mask_type
         self.only_g = only_g
+        self.mask_clip = mask_clip
 
 
     @classmethod
@@ -619,6 +621,7 @@ class StandardROIHeads_NetG(ROIHeads):
             ret.update(cls._init_keypoint_head(cfg, input_shape))
         ret["mask_type"]=cfg.NET_G.MASK_TYPE
         ret["only_g"] = cfg.NET_G.ONLY_G
+        ret["mask_clip"] = cfg.NET_G.MASK_CLIP
         return ret
 
     @classmethod
@@ -810,6 +813,8 @@ class StandardROIHeads_NetG(ROIHeads):
             if mask is None:
                 with torch.no_grad():
                     mask = netG(box_features)
+                if self.mask_clip:
+                    mask[mask>1]=1
             if self.mask_type == 'icassp':
                 box_features_g = box_features*mask
             elif self.mask_type == 'residual':
