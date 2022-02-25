@@ -147,26 +147,52 @@ def do_update_g(model_det, model_g, cfg_det, data):
         masks_pert=[]
         max_scores=[]
         num_instances=[]
-        num_drop = int (mask.numel()/mask.size(0) * cfg_det.NET_G.DROP)
+        if cfg_det.NET_G.DROP_MODE=='anywhere':
+            total_num = int(mask.numel()/mask.size(0))
+            num_drop = int (total_num * cfg_det.NET_G.DROP)
+        elif cfg_det.NET_G.DROP_MODE=='spatial':
+            total_num = int(mask.size(2)*mask.size(3))
+            num_drop = int (total_num * cfg_det.NET_G.DROP)
+        elif cfg_det.NET_G.DROP_MODE=='channel':
+            total_num = int(mask.size(1))
+            num_drop = int(total_num * cfg_det.NET_G.DROP)
+        else:
+            raise NotImplementedError('NET_G.DROP_MODE: {} not implemented.'.format(cfg_det.NET_G.DROP_MODE))
         
         for i in range(9):
-            drop_idxes = list(range(int(mask.numel()/mask.size(0))))
+            drop_idxes = list(range(total_num))
             random.shuffle(drop_idxes)
             drop_idxes = drop_idxes[:num_drop]
-            c_idx,x_idx,y_idx = np.unravel_index(drop_idxes,mask[0].shape)
+            mask_ = mask.clone()
+            if cfg_det.NET_G.DROP_MODE=='anywhere':
+                c_idx,x_idx,y_idx = np.unravel_index(drop_idxes,mask[0].shape)
+                mask_[:,c_idx,x_idx,y_idx] = 0
+            elif cfg_det.NET_G.DROP_MODE=='spatial':
+                x_idx,y_idx = np.unravel_index(drop_idxes,(mask.size(2),mask.size(3)))
+                mask_[:,:,x_idx,y_idx] = 0
+            elif cfg_det.NET_G.DROP_MODE=='channel':
+                c_idx = drop_idxes
+                mask_[:,c_idx,:,:] = 0
+            else:
+                raise NotImplementedError('NET_G.DROP_MODE: {} not implemented.'.format(cfg_det.NET_G.DROP_MODE))
+                
+                
 
             #embed()
-            mask_ = mask.clone()
-            mask_[:,c_idx,x_idx,y_idx] = 0
+            #mask_ = mask.clone()
+            #mask_[:,c_idx,x_idx,y_idx] = 0
 
             with torch.no_grad():
-                if cfg_det.NET_G.UPDATE_MODE == 'icassp':
+                if cfg_det.NET_G.UPDATE_MODE == 'icassp' or cfg_det.NET_G.UPDATE_MODE == 'loss-cls':
                     model_det.train()
                     if distributed:
                         _, detector_loss_g = model_det.module.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
                     else:
                         _, detector_loss_g = model_det.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
-                    scores=sum(detector_loss_g.values()).cpu()
+                    if cfg_det.NET_G.UPDATE_MODE == 'loss-cls':
+                        scores=detector_loss_g['loss_cls'].cpu()
+                    else:
+                        scores=sum(detector_loss_g.values()).cpu()
                     model_det.eval()
                 else: 
                     if cfg_det.NET_G.MASK_TYPE == 'icassp':

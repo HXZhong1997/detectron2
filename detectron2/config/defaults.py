@@ -652,3 +652,4 @@ _C.NET_G.DROP = 0.1
 _C.NET_G.UPDATE_TIMES = 1
 _C.NET_G.ONLY_G = False
 _C.NET_G.MASK_CLIP = False 
+_C.NET_G.DROP_MODE = 'anywhere' #'channel' 'spatial'
