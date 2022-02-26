@@ -41,6 +41,7 @@ class NetG(nn.Module):
         pixel_mean,
         pixel_std,
         input_format,
+        mode,
     ):
         """
         Args:
@@ -54,6 +55,7 @@ class NetG(nn.Module):
             
         """
         super().__init__()
+        self.mode = mode
         self.netG = nn.Sequential(
             nn.Conv2d(in_channels=in_channels,
                 out_channels=in_channels,
@@ -101,6 +103,7 @@ class NetG(nn.Module):
             "input_format": cfg.INPUT.FORMAT,
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
+            "mode": cfg.NET_G.mode,
         }
 
     @property
@@ -136,6 +139,10 @@ class NetG(nn.Module):
             self.netG.eval()
             with torch.no_grad():
                 mask_ret = self.netG(batched_inputs)
+                if self.mode == 'spatial':
+                    mask_ret = torch.mean(mask_ret,dim=1,keepdim=True)
+                if self.mode == 'channel':
+                    mask_ret = torch.nn.functional.adaptive_avg_pool2d(mask_ret,(1,1))
             return mask_ret
         
         assert faster_rcnn is not None
@@ -168,6 +175,12 @@ class NetG(nn.Module):
         box_feats_after = _get_box_feats(faster_rcnn, feats_after, gt_instances_after) 
         
         def _generate_mask(feats_before,feats_after):
+            if self.mode == 'spatial':
+                feats_before = torch.mean(feats_before, dim=1, keepdim=True)
+                feats_after = torch.mean(feats_after, dim=1, keepdim=True)
+            if self.mode == 'channel':
+                feats_before = torch.nn.functional.adaptive_avg_pool2d(feats_before,(1,1))
+                feats_before = torch.nn.functional.adaptive_avg_pool2d(feats_after,(1,1))
             with torch.no_grad():
                 if self.mask_type=='icassp':
                     mask = torch.ones_like(feats_before)
@@ -183,7 +196,12 @@ class NetG(nn.Module):
 
         target = _generate_mask(box_feats_before, box_feats_after)
         
+        
         pred = self.netG(box_feats_before)
+        if self.mode == 'spatial':
+            pred = torch.mean(pred,dim=1,keepdim=True)
+        if self.mode == 'channel':
+            pred = torch.nn.functional.adaptive_avg_pool2d(pred,(1,1))
 
         loss = self.criterion(pred, target)
 
