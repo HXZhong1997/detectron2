@@ -653,4 +653,5 @@ _C.NET_G.UPDATE_TIMES = 1
 _C.NET_G.ONLY_G = False
 _C.NET_G.MASK_CLIP = False 
 _C.NET_G.DROP_MODE = 'anywhere' #'channel' 'spatial'
-_C.NET_G.MODE = 'default' #'channel' 'spatial'
+_C.NET_G.G_MODE = 'default' #'channel' 'spatial'
+_C.NET_G.G_STEP = 0.5

@@ -557,6 +557,7 @@ class StandardROIHeads_NetG(ROIHeads):
         mask_type: Optional[str] = 'icassp',
         only_g: Optional[bool] = False,
         mask_clip: Optional[bool] = False,
+        g_mode: Optional[str] = 'any',
         **kwargs,
     ):
         """
@@ -602,6 +603,7 @@ class StandardROIHeads_NetG(ROIHeads):
         self.mask_type = mask_type
         self.only_g = only_g
         self.mask_clip = mask_clip
+        self.g_mode = g_mode
 
 
     @classmethod
@@ -622,6 +624,7 @@ class StandardROIHeads_NetG(ROIHeads):
         ret["mask_type"]=cfg.NET_G.MASK_TYPE
         ret["only_g"] = cfg.NET_G.ONLY_G
         ret["mask_clip"] = cfg.NET_G.MASK_CLIP
+        ret["g_mode"]=cfg.NET_G.G_MODE
         return ret
 
     @classmethod
@@ -813,6 +816,10 @@ class StandardROIHeads_NetG(ROIHeads):
             if mask is None:
                 with torch.no_grad():
                     mask = netG(box_features)
+                if self.g_mode=='spatial':
+                    mask = torch.mean(mask,dim=1,keepdim=True)
+                if self.g_mode=='channel':
+                    mask = torch.mean(mask,dim=(2,3),keepdim=True)
                 if self.mask_clip:
                     mask[mask>1]=1
             if self.mask_type == 'icassp':

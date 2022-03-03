@@ -83,6 +83,9 @@ class NetG(nn.Module):
             nn.ReLU(inplace=True),
         )
 
+        # if self.mode == 'channel':
+        #     self.criterion = nn.SmoothL1Loss()
+        # else:
         self.criterion = nn.L1Loss()
         self.mask_type = mask_type
 
@@ -103,7 +106,7 @@ class NetG(nn.Module):
             "input_format": cfg.INPUT.FORMAT,
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
-            "mode": cfg.NET_G.mode,
+            "mode": cfg.NET_G.G_MODE,
         }
 
     @property
@@ -139,10 +142,10 @@ class NetG(nn.Module):
             self.netG.eval()
             with torch.no_grad():
                 mask_ret = self.netG(batched_inputs)
-                if self.mode == 'spatial':
-                    mask_ret = torch.mean(mask_ret,dim=1,keepdim=True)
-                if self.mode == 'channel':
-                    mask_ret = torch.nn.functional.adaptive_avg_pool2d(mask_ret,(1,1))
+                # if self.mode == 'spatial':
+                #     mask_ret = torch.mean(mask_ret,dim=1,keepdim=True)
+                # if self.mode == 'channel':
+                #     mask_ret = torch.mean(mask_ret,dim=(2,3),keepdim=True)
             return mask_ret
         
         assert faster_rcnn is not None
@@ -179,8 +182,8 @@ class NetG(nn.Module):
                 feats_before = torch.mean(feats_before, dim=1, keepdim=True)
                 feats_after = torch.mean(feats_after, dim=1, keepdim=True)
             if self.mode == 'channel':
-                feats_before = torch.nn.functional.adaptive_avg_pool2d(feats_before,(1,1))
-                feats_before = torch.nn.functional.adaptive_avg_pool2d(feats_after,(1,1))
+                feats_before = torch.mean(feats_before,dim=(2,3),keepdim=True) #torch.nn.functional.adaptive_avg_pool2d(feats_before,(1,1))
+                feats_after = torch.mean(feats_after,dim=(2,3),keepdim=True) #torch.nn.functional.adaptive_avg_pool2d(feats_after,(1,1))
             with torch.no_grad():
                 if self.mask_type=='icassp':
                     mask = torch.ones_like(feats_before)
@@ -201,10 +204,11 @@ class NetG(nn.Module):
         if self.mode == 'spatial':
             pred = torch.mean(pred,dim=1,keepdim=True)
         if self.mode == 'channel':
-            pred = torch.nn.functional.adaptive_avg_pool2d(pred,(1,1))
+            pred = torch.mean(pred,dim=(2,3),keepdim=True)
 
         loss = self.criterion(pred, target)
-
+        #print('target shape:{}, pred shape:{}'.format(target.shape,pred.shape))
+        #print('loss:', loss)
         losses = {'loss_g': loss}
         return losses
 

@@ -141,8 +141,7 @@ def do_update_g(model_det, model_g, cfg_det, data):
         model_g.eval()
         with torch.no_grad():
             mask = model_g(box_features)
-            if cfg_det.NET_G.MASK_CLIP:
-                mask[mask>1]=1 
+            
         #random perturbation on mask
         masks_pert=[]
         max_scores=[]
@@ -177,7 +176,12 @@ def do_update_g(model_det, model_g, cfg_det, data):
                 raise NotImplementedError('NET_G.DROP_MODE: {} not implemented.'.format(cfg_det.NET_G.DROP_MODE))
                 
                 
-
+            if cfg_det.NET_G.G_MODE == 'spatial':
+                mask_ = torch.mean(mask_,dim=1,keepdim=True)
+            if cfg_det.NET_G.G_MODE == 'channel':
+                mask_ = torch.mean(mask_,dim=(2,3),keepdim=True)
+            if cfg_det.NET_G.MASK_CLIP:
+                mask_[mask_>1]=1    
             #embed()
             #mask_ = mask.clone()
             #mask_[:,c_idx,x_idx,y_idx] = 0
@@ -260,6 +264,11 @@ def do_update_g(model_det, model_g, cfg_det, data):
                 mask_pre = model_g.module.netG(box_features)
             else:
                 mask_pre = model_g.netG(box_features)
+            if cfg_det.NET_G.G_MODE == 'spatial':
+                mask_pre = torch.mean(mask_pre,dim=1,keepdim=True)
+            if cfg_det.NET_G.G_MODE == 'channel':
+                mask_pre = torch.mean(mask_pre,dim=(2,3),keepdim=True)
+
         loss = nn.L1Loss()(mask_pre,mask_tar)
 
         return {'loss_g':loss}
@@ -276,7 +285,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
     optimizer_g = build_optimizer(cfg_g, model_g)
     scheduler_g = torch.optim.lr_scheduler.StepLR(
         optimizer_g,
-        step_size= int(((cfg_det.SOLVER.MAX_ITER - cfg_det.NET_G.UPDATE_START)/cfg_det.NET_G.UPDATE_INTERVAL)*0.5),
+        step_size= int(((cfg_det.SOLVER.MAX_ITER - cfg_det.NET_G.UPDATE_START)/cfg_det.NET_G.UPDATE_INTERVAL)*cfg_det.NET_G.G_STEP),
         gamma=0.1
         )
 
