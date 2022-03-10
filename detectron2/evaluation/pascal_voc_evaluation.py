@@ -73,6 +73,7 @@ class PascalVOCDetectionEvaluator(DatasetEvaluator):
             dict: has a key "segm", whose value is a dict of "AP", "AP50", and "AP75".
         """
         all_predictions = comm.gather(self._predictions, dst=0)
+        
         if not comm.is_main_process():
             return
         predictions = defaultdict(list)
