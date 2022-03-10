@@ -5,6 +5,7 @@ import time
 from collections import OrderedDict, abc
 from contextlib import ExitStack, contextmanager
 from typing import List, Union
+from xmlrpc.client import Boolean
 import torch
 from torch import nn
 
@@ -101,7 +102,7 @@ class DatasetEvaluators(DatasetEvaluator):
 
 
 def inference_on_dataset(
-    model, data_loader, evaluator: Union[DatasetEvaluator, List[DatasetEvaluator], None]
+    model, data_loader, evaluator: Union[DatasetEvaluator, List[DatasetEvaluator], None], split=False,
 ):
     """
     Run model on the data_loader and evaluate the metrics with evaluator.
@@ -200,7 +201,15 @@ def inference_on_dataset(
             total_compute_time_str, total_compute_time / (total - num_warmup), num_devices
         )
     )
-
+    
+    if split:
+        sets = ['test_20plus','test_10plus','test_5plus','test_5less']
+        results = {}
+        for it in sets:
+            result = evaluator.evaluate(it)
+            results[it]=result
+        return results
+    
     results = evaluator.evaluate()
     # An evaluator may return None when not in main process.
     # Replace it by an empty dict instead to make it easier for downstream code to handle
