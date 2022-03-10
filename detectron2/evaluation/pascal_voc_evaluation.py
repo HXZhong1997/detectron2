@@ -47,7 +47,14 @@ class PascalVOCDetectionEvaluator(DatasetEvaluator):
         self._is_2007 = meta.year == 2007
         self._cpu_device = torch.device("cpu")
         self._logger = logging.getLogger(__name__)
-
+        
+        self.split_image_set_path = {
+            'test_20plus': os.path.join(meta.dirname, "ImageSets", "Main", "test_20plus.txt"),
+            'test_10plus': os.path.join(meta.dirname, "ImageSets", "Main", "test_10plus.txt"),
+            'test_5plus': os.path.join(meta.dirname, "ImageSets", "Main", "test_5plus.txt"),
+            'test_5less': os.path.join(meta.dirname, "ImageSets", "Main", "test_5less.txt"),
+        }
+    
     def reset(self):
         self._predictions = defaultdict(list)  # class name -> list of prediction strings
 
@@ -67,7 +74,7 @@ class PascalVOCDetectionEvaluator(DatasetEvaluator):
                     f"{image_id} {score:.3f} {xmin:.1f} {ymin:.1f} {xmax:.1f} {ymax:.1f}"
                 )
 
-    def evaluate(self):
+    def evaluate(self, split='all'):
         """
         Returns:
             dict: has a key "segm", whose value is a dict of "AP", "AP50", and "AP75".
@@ -75,6 +82,9 @@ class PascalVOCDetectionEvaluator(DatasetEvaluator):
         all_predictions = comm.gather(self._predictions, dst=0)
         if not comm.is_main_process():
             return
+        if split != 'all':
+            all_predictions = self.filter_images(split, all_predictions)
+        
         predictions = defaultdict(list)
         for predictions_per_rank in all_predictions:
             for clsid, lines in predictions_per_rank.items():
@@ -99,20 +109,48 @@ class PascalVOCDetectionEvaluator(DatasetEvaluator):
                     f.write("\n".join(lines))
 
                 for thresh in range(50, 100, 5):
-                    rec, prec, ap = voc_eval(
-                        res_file_template,
-                        self._anno_file_template,
-                        self._image_set_path,
-                        cls_name,
-                        ovthresh=thresh / 100.0,
-                        use_07_metric=self._is_2007,
-                    )
+                    if split == 'all':
+                        rec, prec, ap = voc_eval(
+                            res_file_template,
+                            self._anno_file_template,
+                            self._image_set_path,
+                            cls_name,
+                            ovthresh=thresh / 100.0,
+                            use_07_metric=self._is_2007,
+                        )
+                    else:
+                        rec, prec, ap = voc_eval(
+                            res_file_template,
+                            self._anno_file_template,
+                            self.split_image_set_path[split],
+                            cls_name,
+                            ovthresh=thresh / 100.0,
+                            use_07_metric=self._is_2007,
+                        )
                     aps[thresh].append(ap * 100)
 
         ret = OrderedDict()
         mAP = {iou: np.mean(x) for iou, x in aps.items()}
         ret["bbox"] = {"AP": np.mean(list(mAP.values())), "AP50": mAP[50], "AP75": mAP[75]}
         return ret
+
+    def filter_images(self, split, predictions):
+        with open(self.split_image_set_path[split]) as f:
+            images = f.readlines()
+        images = set([it.strip() for it in images])
+        pred = {}
+        for cls_id, lines in predictions.items():
+            lines_ = []
+            for line in lines:
+                if line.split(' ')[0] in images:
+                    lines_.append(line)
+            pred[cls_id]=lines_
+        return pred
+
+
+            
+
+        
 
 
 ##############################################################################

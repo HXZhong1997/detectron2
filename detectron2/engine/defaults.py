@@ -131,6 +131,12 @@ Run on multiple machines:
         "https://pytorch.org/docs/stable/distributed.html for details.",
     )
     parser.add_argument(
+        "--split",
+        default=False,
+        action='store_true',
+        help="to test pascal voc by split",
+    )
+    parser.add_argument(
         "opts",
         help="""
 Modify config options at the end of the command. For Yacs configs, use
@@ -140,6 +146,7 @@ For python-based LazyConfig, use "path.key=value".
         default=None,
         nargs=argparse.REMAINDER,
     )
+
     return parser
 
 

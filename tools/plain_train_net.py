@@ -22,6 +22,7 @@ It also includes fewer abstraction, therefore is easier to add custom logic.
 import logging
 import os
 from collections import OrderedDict
+from cv2 import split
 import torch
 from torch.nn.parallel import DistributedDataParallel
 
@@ -100,12 +101,18 @@ def do_test(cfg, model):
         evaluator = get_evaluator(
             cfg, dataset_name, os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
         )
-        results_i = inference_on_dataset(model, data_loader, evaluator)
-        results[dataset_name] = results_i
-        if comm.is_main_process():
-            logger.info("Evaluation results for {} in csv format:".format(dataset_name))
-            print_csv_format(results_i)
-    if len(results) == 1:
+        results_i = inference_on_dataset(model, data_loader, evaluator, split=args.split)
+        if args.split:
+            if comm.is_main_process():
+                for k,result in results_i.items:
+                    logger.info("Evaluation results for {} in csv format:".format(dataset_name+'_'+k))
+                    print_csv_format(result)
+        else:
+            results[dataset_name] = results_i
+            if comm.is_main_process():
+                logger.info("Evaluation results for {} in csv format:".format(dataset_name))
+                print_csv_format(results_i)
+    if len(results) == 1 and args.split:
         results = list(results.values())[0]
     return results
 
