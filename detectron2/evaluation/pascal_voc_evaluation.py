@@ -80,7 +80,6 @@ class PascalVOCDetectionEvaluator(DatasetEvaluator):
             dict: has a key "segm", whose value is a dict of "AP", "AP50", and "AP75".
         """
         all_predictions = comm.gather(self._predictions, dst=0)
-        
         if not comm.is_main_process():
             return
         if split != 'all':
@@ -139,13 +138,16 @@ class PascalVOCDetectionEvaluator(DatasetEvaluator):
         with open(self.split_image_set_path[split]) as f:
             images = f.readlines()
         images = set([it.strip() for it in images])
-        pred = {}
-        for cls_id, lines in predictions.items():
-            lines_ = []
-            for line in lines:
-                if line.split(' ')[0] in images:
-                    lines_.append(line)
-            pred[cls_id]=lines_
+        pred = []
+        for prediction in predictions:
+            pred_ = {}
+            for cls_id, lines in prediction.items():
+                lines_ = []
+                for line in lines:
+                    if line.split(' ')[0] in images:
+                        lines_.append(line)
+                pred_[cls_id]=lines_
+            pred.append(pred_)
         return pred
 
 
