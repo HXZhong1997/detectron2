@@ -104,7 +104,7 @@ def do_test(cfg, model):
         results_i = inference_on_dataset(model, data_loader, evaluator, split=args.split)
         if args.split:
             if comm.is_main_process():
-                for k,result in results_i.items:
+                for k,result in results_i.items():
                     logger.info("Evaluation results for {} in csv format:".format(dataset_name+'_'+k))
                     print_csv_format(result)
         else:
