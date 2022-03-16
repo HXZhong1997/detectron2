@@ -226,4 +226,3 @@ class NetG(nn.Module):
         images_after = ImageList.from_tensors(images_after, size_divisibility)
         return images_before, images_after
 
-
