@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 import inspect
 import logging
-from randomrandom, 
+from random import random
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 import torch
