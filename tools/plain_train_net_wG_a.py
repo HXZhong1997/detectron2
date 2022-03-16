@@ -271,7 +271,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
     start_iter = (
         checkpointer.resume_or_load(cfg_det.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
     )
-    max_iter = cfg_det.SOLVER.MAX_ITER
+    max_iter = cfg_det.SOLVER.MAX_ITER 
 
     periodic_checkpointer = PeriodicCheckpointer(
         checkpointer, cfg_det.SOLVER.CHECKPOINT_PERIOD, max_iter=max_iter
