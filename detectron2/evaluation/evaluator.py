@@ -203,7 +203,7 @@ def inference_on_dataset(
     )
     
     if split:
-        sets = ['test_20plus','test_10plus','test_5plus','test_5less']
+        sets = ['test_10more','test_20plus','test_10plus','test_5plus','test_5less']
         results = {}
         for it in sets:
             result = evaluator.evaluate(it)

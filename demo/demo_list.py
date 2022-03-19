@@ -58,6 +58,11 @@ def get_parser():
         "If not given, will show output in an OpenCV window.",
     )
     parser.add_argument(
+        "--png",
+        action='store_true',
+        default=False,
+    )
+    parser.add_argument(
         "--img-dir",
         help="director to imgs ",
         type=str,
@@ -101,19 +106,20 @@ if __name__ == "__main__":
     setup_logger(name="fvcore")
     logger = setup_logger()
     logger.info("Arguments: " + str(args))
-
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
     cfg = setup_cfg(args)
 
     demo = VisualizationDemo(cfg)
 
     if args.input:
         if len(args.input) == 1:
-            if args.input.endswith('txt'):
-                with open(args.input) as f:
+            if args.input[0].endswith('txt'):
+                with open(args.input[0]) as f:
                     imgs = f.readlines()
                 imgs = [it.strip()+'.jpg' for it in imgs]
             
-        for path in tqdm.tqdm(args.input, disable=not args.output):
+        for path in tqdm.tqdm(imgs, disable=not args.output):
             # use PIL, to be consistent with evaluation
             path = os.path.join(args.img_dir,path)
             img = read_image(path, format="BGR")
@@ -133,6 +139,8 @@ if __name__ == "__main__":
                 if os.path.isdir(args.output):
                     assert os.path.isdir(args.output), args.output
                     out_filename = os.path.join(args.output, os.path.basename(path))
+                    if args.png:
+                        out_filename = out_filename[:-4]+'.png'
                 else:
                     assert len(args.input) == 1, "Please specify a directory with args.output"
                     out_filename = args.output

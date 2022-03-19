@@ -154,7 +154,7 @@ def do_update_g(model_det, model_g, cfg_det, data):
                 masks_slide.append(mask_)            
                     
         #random perturbation on mask
-
+        max_scores=[]
         for mask_ in masks_slide:
             
             with torch.no_grad():
@@ -198,7 +198,9 @@ def do_update_g(model_det, model_g, cfg_det, data):
                             scores.append(it.scores.max().cpu()) #batchsize * 1
             
             max_scores.append(scores)
-            masks_pert.append(mask_)
+            #masks_pert.append(mask_)
+ 
+        masks_pert = masks_slide
 
         #TODO: select target mask and update netG
         def select_mask(max_scores):
@@ -239,8 +241,8 @@ def do_update_g(model_det, model_g, cfg_det, data):
                 mask_pre = torch.mean(mask_pre,dim=1,keepdim=True)
             if cfg_det.NET_G.G_MODE == 'channel':
                 mask_pre = torch.mean(mask_pre,dim=(2,3),keepdim=True)
-
-        loss = nn.L1Loss()(mask_pre,mask_tar)
+        
+        loss = nn.L1Loss()(mask_pre,mask_tar.expand(mask_pre.shape))
 
         return {'loss_g':loss}
         
@@ -291,7 +293,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
             if iteration == cfg_det.NET_G.PRETRAIN_START:
                 model_det.eval()
                 model_g.train()
-            if iteration +1 == cfg_det.NET_G.UPDATE_START:
+            if iteration  == cfg_det.NET_G.UPDATE_START+1:
                 model_g.eval()
                 model_det.train()
             
@@ -314,7 +316,7 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
                 optimizer_g.step()
                 scheduler_g.step()
 
-                logger.info('Net-G Updated at iter {}  #{}  loss_g: {:.4f}   sec: {:.5f}'.format(iteration, i, loss_dict_reduced['loss_g'], time.time()-tic))
+                logger.info('Net-G Updated at iter {}   loss_g: {:.4f}   sec: {:.5f}'.format(iteration,  loss_dict_reduced['loss_g'], time.time()-tic))
                 continue
 
 
