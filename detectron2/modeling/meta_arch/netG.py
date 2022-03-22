@@ -1,5 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
-from ctypes.wintypes import LARGE_INTEGER
+#from ctypes.wintypes import LARGE_INTEGER
 import logging
 import numpy as np
 from typing import Dict, List, Optional, Tuple
@@ -58,6 +58,7 @@ class NetG(nn.Module):
         """
         super().__init__()
         self.mode = mode
+        self.version = version
         if self.version == 'version2':
             self.netG = nn.Sequential(
                 nn.Conv2d(in_channels=in_channels,
@@ -210,15 +211,13 @@ class NetG(nn.Module):
         
         box_feats_before = _get_box_feats(faster_rcnn, feats_before, gt_instances_before) # tensor, proposal_num * channel * w * h (n*256*7*7)  
         box_feats_after = _get_box_feats(faster_rcnn, feats_after, gt_instances_after) 
-        from IPython import embed
-        embed() 
         def _generate_mask(feats_before,feats_after):
             if self.version == 'version2':
                 m = feats_after/(feats_before+1e-9)
                 m=m.cpu().flatten()
                 m=torch.abs(m)
-                _, idx = m.topk(k=5000,largest=False)
-                idx = np.unravel_index(idx)
+                _, idx = m.topk(k=int(0.1*len(m)),largest=False)
+                idx = np.unravel_index(idx,feats_before.shape)
                 mask = torch.ones_like(feats_before)
                 mask[idx]=0
                 return mask
