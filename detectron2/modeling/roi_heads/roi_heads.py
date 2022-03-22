@@ -828,14 +828,14 @@ class StandardROIHeads_NetG(ROIHeads):
                 box_features_g = box_features+mask
             elif self.mask_type == 'gaussian':
                 mask = torch.randn_like(box_features[0])
-                box_features_g = box_features * (mask.unsqueeze(dim=-1))
+                box_features_g = box_features * (mask.unsqueeze(dim=0))
             elif self.mask_type == 'random':
                 drop_idxes = np.random.permutation(box_features[0].numel())
                 drop_idxes = drop_idxes[:int(0.3*len(drop_idxes))]
                 c_,x_,y_=np.unravel_index(drop_idxes,box_features[0].shape)
                 mask = torch.ones_like(box_features[0])
                 mask[c_,x_,y_] = 0
-                box_features_g = box_features * (mask.unsqueeze(dim=-1))
+                box_features_g = box_features * (mask.unsqueeze(dim=0))
             else:
                 raise NotImplementedError
             

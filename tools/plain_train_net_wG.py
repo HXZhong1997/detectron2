@@ -292,7 +292,10 @@ def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
     checkpointer_g = DetectionCheckpointer(
         model_g, cfg_g.OUTPUT_DIR,
     )
-    checkpointer_g.load(os.path.join(cfg_g.OUTPUT_DIR,'model_final.pth'))
+    try:
+        checkpointer_g.load(os.path.join(cfg_g.OUTPUT_DIR,'model_final.pth'))
+    except:
+        logger.info('Cannot load: {}'.format(os.path.join(cfg_g.OUTPUT_DIR,'model_final.pth')))
 
     checkpointer = DetectionCheckpointer(
         model_det, cfg_det.OUTPUT_DIR, optimizer=optimizer, scheduler=scheduler
