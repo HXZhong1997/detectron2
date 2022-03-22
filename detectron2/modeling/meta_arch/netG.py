@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
+from ctypes.wintypes import LARGE_INTEGER
 import logging
 import numpy as np
 from typing import Dict, List, Optional, Tuple
@@ -42,6 +43,7 @@ class NetG(nn.Module):
         pixel_std,
         input_format,
         mode,
+        version,
     ):
         """
         Args:
@@ -56,37 +58,68 @@ class NetG(nn.Module):
         """
         super().__init__()
         self.mode = mode
-        self.netG = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels,
-                out_channels=in_channels,
-                kernel_size=3,
-                padding=1,
-            ),
-            nn.BatchNorm2d(
-                num_features=in_channels,
-            ),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=in_channels,
-                      out_channels=in_channels,
-                      kernel_size=3,
-                      padding=1,
-                      groups=in_channels,
-            ),
-            nn.Conv2d(in_channels=in_channels,
-                      out_channels=in_channels,
-                      kernel_size=1,
-                      padding=0,
-            ),
-            nn.BatchNorm2d(
-                num_features=in_channels,
-            ),
-            nn.ReLU(inplace=True),
-        )
+        if self.version == 'version2':
+            self.netG = nn.Sequential(
+                nn.Conv2d(in_channels=in_channels,
+                    out_channels=in_channels,
+                    kernel_size=3,
+                    padding=1,
+                ),
+                nn.BatchNorm2d(
+                    num_features=in_channels,
+                ),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(in_channels=in_channels,
+                        out_channels=in_channels,
+                        kernel_size=3,
+                        padding=1,
+                        groups=in_channels,
+                ),
+                nn.Conv2d(in_channels=in_channels,
+                        out_channels=in_channels,
+                        kernel_size=1,
+                        padding=0,
+                ),
+                nn.BatchNorm2d(
+                    num_features=in_channels,
+                ),
+                nn.Sigmoid(),
+            )
+        else:
+            self.netG = nn.Sequential(
+                nn.Conv2d(in_channels=in_channels,
+                    out_channels=in_channels,
+                    kernel_size=3,
+                    padding=1,
+                ),
+                nn.BatchNorm2d(
+                    num_features=in_channels,
+                ),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(in_channels=in_channels,
+                        out_channels=in_channels,
+                        kernel_size=3,
+                        padding=1,
+                        groups=in_channels,
+                ),
+                nn.Conv2d(in_channels=in_channels,
+                        out_channels=in_channels,
+                        kernel_size=1,
+                        padding=0,
+                ),
+                nn.BatchNorm2d(
+                    num_features=in_channels,
+                ),
+                nn.ReLU(inplace=True),
+            )
 
         # if self.mode == 'channel':
         #     self.criterion = nn.SmoothL1Loss()
         # else:
-        self.criterion = nn.L1Loss()
+        if self.version == 'version2':
+            self.criterion=nn.BCELoss()
+        else:
+            self.criterion = nn.L1Loss()
         self.mask_type = mask_type
 
         self.input_format = input_format
@@ -107,6 +140,7 @@ class NetG(nn.Module):
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
             "mode": cfg.NET_G.G_MODE,
+            "version": cfg.NET_G.VERSION,
         }
 
     @property
@@ -178,6 +212,16 @@ class NetG(nn.Module):
         box_feats_after = _get_box_feats(faster_rcnn, feats_after, gt_instances_after) 
         
         def _generate_mask(feats_before,feats_after):
+            if self.version == 'version2':
+                m = feats_after/(feats_before+1e-9)
+                m=m.cpu().flatten()
+                m=torch.abs(m)
+                _, idx = m.topk(k=5000,largest=False)
+                idx = np.unravel_index(idx)
+                mask = torch.ones_like(feats_before)
+                mask[idx]=0
+                return mask
+            
             if self.mode == 'spatial':
                 feats_before = torch.mean(feats_before, dim=1, keepdim=True)
                 feats_after = torch.mean(feats_after, dim=1, keepdim=True)

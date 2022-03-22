@@ -8,13 +8,13 @@
 
 #python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2-no2svr.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 4 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-no2svr-i30-d3-icassp-gs005-clip2  NET_G.INTERVAL 30  NET_G.START_ITER 10000  NET_G.ONLY_G True NET_G.MASK_CLIP True
 
-python tools/plain_train_net_wG.py --resume --config-file configs/faster-rcnn-g/Net-G-lr1e-2-no2svr.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 4 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-ui10-d3random3  NET_G.INTERVAL 10  NET_G.START_ITER 10000 NET_G.ONLY_G True NET_G.MASK_CLIP True NET_G.MASK_TYPE 'random'
+#python tools/plain_train_net_wG.py --resume --config-file configs/faster-rcnn-g/Net-G-lr1e-2-no2svr.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 4 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-ui10-d3random3  NET_G.INTERVAL 10  NET_G.START_ITER 10000 NET_G.ONLY_G True NET_G.MASK_CLIP True NET_G.MASK_TYPE 'random'
 
 #python tools/plain_train_net_wG.py --resume --config-file configs/faster-rcnn-g/Net-G-lr1e-2-no2svr.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 4 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-i10-gauss  NET_G.INTERVAL 10  NET_G.START_ITER 10000 NET_G.ONLY_G True NET_G.MASK_CLIP True NET_G.MASK_TYPE 'gaussian'
 
 #python tools/plain_train_net_wG.py --resume --config-file configs/faster-rcnn-g/Net-G-lr1e-2.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 4 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-ui10x4-d3-icassp-gs005-clip2  NET_G.INTERVAL 10  NET_G.START_ITER 10000 NET_G.UPDATE_START 10000 NET_G.UPDATE_INTERVAL 10 NET_G.UPDATE_MODE 'icassp' NET_G.ONLY_G True NET_G.UPDATE_TIMES 4 NET_G.DROP 0.3 NET_G.MASK_CLIP True NET_G.G_STEP 0.05
 
-#python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2-no2svr.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 4 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-no2svr-ui10x4-gs005-clip-confuse  NET_G.INTERVAL 10  NET_G.START_ITER 10000  NET_G.ONLY_G True NET_G.MASK_CLIP True NET_G.UPDATE_START 10000 NET_G.UPDATE_INTERVAL 10 NET_G.UPDATE_TIMES 4 NET_G.UPDATE_MODE 'confuse' NET_G.DROP 0.3 NET_G.G_STEP 0.05
+python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2-no2svr-scratch.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 4 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-no2svr-scr-ui20x4-icassp-clip  NET_G.INTERVAL 20  NET_G.START_ITER 10000  NET_G.ONLY_G True NET_G.MASK_CLIP True NET_G.UPDATE_START 10000 NET_G.UPDATE_INTERVAL 20 NET_G.UPDATE_TIMES 4 NET_G.UPDATE_MODE 'icassp' NET_G.DROP 0.3 NET_G.G_STEP 0.05
 
 #python tools/plain_train_net_wG.py --config-file configs/faster-rcnn-g/Net-G-lr1e-2-svr.yaml --config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml --num-gpus 4 OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-svr-i30-d3-icassp-gs005-clip  NET_G.INTERVAL 30  NET_G.START_ITER 10000  NET_G.ONLY_G True NET_G.MASK_CLIP True
 

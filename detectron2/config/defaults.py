@@ -656,3 +656,4 @@ _C.NET_G.DROP_MODE = 'anywhere' #'channel' 'spatial'
 _C.NET_G.G_MODE = 'default' #'channel' 'spatial'
 _C.NET_G.G_STEP = 0.5
 _C.NET_G.PRETRAIN_START = 10000
+_C.NET_G.VERSION = "version1"
