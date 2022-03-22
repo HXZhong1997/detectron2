@@ -176,7 +176,8 @@ class NetG(nn.Module):
         
         box_feats_before = _get_box_feats(faster_rcnn, feats_before, gt_instances_before) # tensor, proposal_num * channel * w * h (n*256*7*7)  
         box_feats_after = _get_box_feats(faster_rcnn, feats_after, gt_instances_after) 
-        
+        from IPython import embed
+        embed() 
         def _generate_mask(feats_before,feats_after):
             if self.mode == 'spatial':
                 feats_before = torch.mean(feats_before, dim=1, keepdim=True)

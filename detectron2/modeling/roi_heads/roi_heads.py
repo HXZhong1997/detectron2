@@ -812,7 +812,6 @@ class StandardROIHeads_NetG(ROIHeads):
         """
         features = [features[f] for f in self.box_in_features]
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
-
         if self.training and netG is not None:
             if mask is None and self.mask_type != 'random' and self.mask_type != 'gaussian':
                 with torch.no_grad():
