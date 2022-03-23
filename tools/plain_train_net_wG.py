@@ -141,6 +141,12 @@ def do_update_g(model_det, model_g, cfg_det, data):
         model_g.eval()
         with torch.no_grad():
             mask = model_g(box_features)
+            if cfg_det.NET_G.VERSION == 'version3':
+                _,idx=mask.reshape(mask.size(0),-1).topk(dim=1,k=int(0.1*mask.numel()/mask.size(0)),largest=False)
+                mask = torch.ones_like(mask)
+                for i in range(idx.size(0)):
+                    idx_ = np.unravel_index(idx[i],mask[0].shape)
+                    mask[i][idx_] = 0
             
         #random perturbation on mask
         masks_pert=[]
@@ -180,7 +186,7 @@ def do_update_g(model_det, model_g, cfg_det, data):
                 mask_ = torch.mean(mask_,dim=1,keepdim=True)
             if cfg_det.NET_G.G_MODE == 'channel':
                 mask_ = torch.mean(mask_,dim=(2,3),keepdim=True)
-            if cfg_det.NET_G.MASK_CLIP:
+            if cfg_det.NET_G.MASK_CLIP and cfg_det.NET_G.VERSION != 'version2':
                 mask_[mask_>1]=1    
             #embed()
             #mask_ = mask.clone()
