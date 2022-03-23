@@ -59,7 +59,7 @@ class NetG(nn.Module):
         super().__init__()
         self.mode = mode
         self.version = version
-        if self.version == 'version2':
+        if self.version == 'version2' or self.version == 'version3':
             self.netG = nn.Sequential(
                 nn.Conv2d(in_channels=in_channels,
                     out_channels=in_channels,
@@ -117,7 +117,7 @@ class NetG(nn.Module):
         # if self.mode == 'channel':
         #     self.criterion = nn.SmoothL1Loss()
         # else:
-        if self.version == 'version2':
+        if self.version == 'version2' or self.version == 'version3':
             self.criterion=nn.BCELoss()
         else:
             self.criterion = nn.L1Loss()
@@ -220,6 +220,18 @@ class NetG(nn.Module):
                 idx = np.unravel_index(idx,feats_before.shape)
                 mask = torch.ones_like(feats_before)
                 mask[idx]=0
+                return mask
+            
+            if self.version == 'version3':
+                m = feats_after/(feats_before+1e-9)
+                m=m.cpu().reshape(feats_after.size(0),-1)
+                m=torch.abs(m)
+                mask = torch.ones_like(feats_before)
+                _, idx = m.topk(dim=1,k=int(0.1*m.size(1)),largest=False)
+
+                for i in range(idx.size(0)):
+                    idx_ = np.unravel_index(idx[i],feats_after[0].shape)
+                    mask[i][idx_] = 0
                 return mask
             
             if self.mode == 'spatial':
