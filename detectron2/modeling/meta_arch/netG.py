@@ -117,7 +117,7 @@ class NetG(nn.Module):
         # if self.mode == 'channel':
         #     self.criterion = nn.SmoothL1Loss()
         # else:
-        if self.version == 'version2' or self.version == 'version3':
+        if False and self.version == 'version2' or self.version == 'version3':
             self.criterion=nn.BCELoss()
         else:
             self.criterion = nn.L1Loss()
