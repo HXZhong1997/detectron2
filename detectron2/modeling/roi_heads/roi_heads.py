@@ -830,7 +830,7 @@ class StandardROIHeads_NetG(ROIHeads):
                     _,idx=mask.reshape(mask.size(0),-1).topk(dim=1,k=int(0.1*mask.numel()/mask.size(0)),largest=False)
                     mask = torch.ones_like(mask)
                     for i in range(idx.size(0)):
-                        idx_ = np.unravel_index(idx[i],mask[0].shape)
+                        idx_ = np.unravel_index(idx[i].cpu(),mask[0].cpu().shape)
                         mask[i][idx_] = 0
 
             if self.mask_type == 'icassp':

@@ -114,171 +114,315 @@ def do_test(cfg, model):
     if len(results) == 1:
         results = list(results.values())[0]
     return results
+def do_update_g_sel(model_det,model_g, cfg_det, data):
 
-def do_update_g(model_det, model_g, cfg_det, data):
-        distributed = comm.get_world_size() > 1
-        if "instances" in data[0]:
-            gt_instances = [x["instances"].to(model_det.device) for x in data]
-        else:
-            gt_instances = None
-        if distributed:
-            images = model_det.module.preprocess_image(data)
-            with torch.no_grad():
-                features_orig = model_det.module.backbone(images.tensor)
-                proposals, _ = model_det.module.proposal_generator(images, features_orig, None)
-                proposals = model_det.module.roi_heads.label_and_sample_proposals(proposals, gt_instances)
-                features = [features_orig[f] for f in model_det.module.roi_heads.box_in_features]
-                box_features = model_det.module.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
-        else:
-            images = model_det.preprocess_image(data)
-            with torch.no_grad():
-                features_orig = model_det.backbone(images.tensor)
-                proposals, _ = model_det.proposal_generator(images, features_orig, None)
-                proposals = model_det.roi_heads.label_and_sample_proposals(proposals, gt_instances)
-                features = [features_orig[f] for f in model_det.roi_heads.box_in_features]
-                box_features = model_det.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
-        
-        model_g.eval()
+    distributed = comm.get_world_size() > 1
+    if "instances" in data[0]:
+        gt_instances = [x["instances"].to(model_det.device) for x in data]
+    else:
+        gt_instances = None
+    if distributed:
+        images = model_det.module.preprocess_image(data)
         with torch.no_grad():
-            mask = model_g(box_features)
-            if cfg_det.NET_G.VERSION == 'version3':
-                _,idx=mask.reshape(mask.size(0),-1).topk(dim=1,k=int(0.1*mask.numel()/mask.size(0)),largest=False)
-                mask = torch.ones_like(mask)
-                for i in range(idx.size(0)):
-                    idx_ = np.unravel_index(idx[i],mask[0].shape)
-                    mask[i][idx_] = 0
-            
-        #random perturbation on mask
-        masks_pert=[]
-        max_scores=[]
-        num_instances=[]
-        if cfg_det.NET_G.DROP_MODE=='anywhere':
-            total_num = int(mask.numel()/mask.size(0))
-            num_drop = int (total_num * cfg_det.NET_G.DROP)
-        elif cfg_det.NET_G.DROP_MODE=='spatial':
-            total_num = int(mask.size(2)*mask.size(3))
-            num_drop = int (total_num * cfg_det.NET_G.DROP)
-        elif cfg_det.NET_G.DROP_MODE=='channel':
-            total_num = int(mask.size(1))
-            num_drop = int(total_num * cfg_det.NET_G.DROP)
-        else:
-            raise NotImplementedError('NET_G.DROP_MODE: {} not implemented.'.format(cfg_det.NET_G.DROP_MODE))
-        
-        for i in range(9):
-            drop_idxes = list(range(total_num))
-            random.shuffle(drop_idxes)
-            drop_idxes = drop_idxes[:num_drop]
-            mask_ = mask.clone()
-            if cfg_det.NET_G.DROP_MODE=='anywhere':
-                c_idx,x_idx,y_idx = np.unravel_index(drop_idxes,mask[0].shape)
-                mask_[:,c_idx,x_idx,y_idx] = 0
-            elif cfg_det.NET_G.DROP_MODE=='spatial':
-                x_idx,y_idx = np.unravel_index(drop_idxes,(mask.size(2),mask.size(3)))
-                mask_[:,:,x_idx,y_idx] = 0
-            elif cfg_det.NET_G.DROP_MODE=='channel':
-                c_idx = drop_idxes
-                mask_[:,c_idx,:,:] = 0
-            else:
-                raise NotImplementedError('NET_G.DROP_MODE: {} not implemented.'.format(cfg_det.NET_G.DROP_MODE))
-                
-                
-            if cfg_det.NET_G.G_MODE == 'spatial':
-                mask_ = torch.mean(mask_,dim=1,keepdim=True)
-            if cfg_det.NET_G.G_MODE == 'channel':
-                mask_ = torch.mean(mask_,dim=(2,3),keepdim=True)
-            if cfg_det.NET_G.MASK_CLIP and cfg_det.NET_G.VERSION != 'version2':
-                mask_[mask_>1]=1    
-            #embed()
-            #mask_ = mask.clone()
-            #mask_[:,c_idx,x_idx,y_idx] = 0
+            features_orig = model_det.module.backbone(images.tensor)
+            proposals, _ = model_det.module.proposal_generator(images, features_orig, None)
+            proposals = model_det.module.roi_heads.label_and_sample_proposals(proposals, gt_instances)
+            features = [features_orig[f] for f in model_det.module.roi_heads.box_in_features]
+            box_features = model_det.module.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
+    else:
+        images = model_det.preprocess_image(data)
+        with torch.no_grad():
+            features_orig = model_det.backbone(images.tensor)
+            proposals, _ = model_det.proposal_generator(images, features_orig, None)
+            proposals = model_det.roi_heads.label_and_sample_proposals(proposals, gt_instances)
+            features = [features_orig[f] for f in model_det.roi_heads.box_in_features]
+            box_features = model_det.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
+    
+    model_g.eval()
 
-            with torch.no_grad():
-                if cfg_det.NET_G.UPDATE_MODE == 'icassp' or cfg_det.NET_G.UPDATE_MODE == 'loss-cls':
-                    model_det.train()
-                    if distributed:
-                        _, detector_loss_g = model_det.module.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
-                    else:
-                        _, detector_loss_g = model_det.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
-                    if cfg_det.NET_G.UPDATE_MODE == 'loss-cls':
-                        scores=detector_loss_g['loss_cls'].cpu()
-                    else:
-                        scores=sum(detector_loss_g.values()).cpu()
-                    model_det.eval()
-                else: 
-                    if cfg_det.NET_G.MASK_TYPE == 'icassp':
-                        box_features_ = box_features * mask_
-                    elif cfg_det.NET_G.MASK_TYPE == 'residual':
-                        box_features_ = box_features + mask_
-                    else:
-                        raise NotImplementedError
-                    
-                    if distributed:
-                        box_features_ = model_det.module.roi_heads.box_head(box_features_)
-                        predictions = model_det.module.roi_heads.box_predictor(box_features_)
-                        pred_instances = model_det.module.roi_heads.box_predictor.inference(predictions,proposals)
-                    else:
-                        box_features_ = model_det.roi_heads.box_head(box_features_)
-                        predictions = model_det.roi_heads.box_predictor(box_features_)
-                        pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
-                    
-                    scores=[]
-
-                    for it in pred_instances[0]:
-                        if len(it.scores) == 0: #TODO: no such field
-                            scores.append(torch.tensor(0,dtype=box_features_.dtype))
-                        elif cfg_det.NET_G.UPDATE_MODE=='confuse':
-                            idx = torch.argmin(torch.abs(it.scores-0.5))
-                            scores.append(it.scores[idx].cpu())
-                        else:
-                            scores.append(it.scores.max().cpu()) #batchsize * 1
-            
-            max_scores.append(scores)
+    #random perturbation on mask
+    masks_pert=[]
+    max_scores=[]
+    num_instances=[]
+    win_width=3
+    win_overlap=1
+    for i in range(3):
+        for j in range(3):
+            mask_ = torch.ones_like(box_features)
+            x_start = i*win_width-i*win_overlap
+            x_end = x_start+win_width
+            y_start = i*win_width-i*win_overlap
+            y_end = y_start+win_width
+            mask_[:,:,x_start:x_end,y_start:y_end]=0
             masks_pert.append(mask_)
+    
+    # if cfg_det.NET_G.VERSION == 'version3':
+    #     with torch.no_grad():
+    #         mask = model_g(box_features)
+    #             _,idx=mask.reshape(mask.size(0),-1).topk(dim=1,k=int(0.1*mask.numel()/mask.size(0)),largest=False)
+    #             mask = torch.ones_like(mask)
+    #             for i in range(idx.size(0)):
+    #                 idx_ = np.unravel_index(idx[i].cpu(),mask[0].cpu().shape)
+    #                 mask[i][idx_] = 0
+    
+    for i in range(9):
+        with torch.no_grad():
+            mask_ = masks_pert[i]
+            if cfg_det.NET_G.UPDATE_MODE == 'icassp' or cfg_det.NET_G.UPDATE_MODE == 'loss-cls':
+                model_det.train()
+                if distributed:
+                    _, detector_loss_g = model_det.module.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
+                else:
+                    _, detector_loss_g = model_det.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
+                if cfg_det.NET_G.UPDATE_MODE == 'loss-cls':
+                    scores=detector_loss_g['loss_cls'].cpu()
+                else:
+                    scores=sum(detector_loss_g.values()).cpu()
+                model_det.eval()
+            else: 
+                if cfg_det.NET_G.MASK_TYPE == 'icassp':
+                    box_features_ = box_features * mask_
+                elif cfg_det.NET_G.MASK_TYPE == 'residual':
+                    box_features_ = box_features + mask_
+                else:
+                    raise NotImplementedError
+                
+                if distributed:
+                    box_features_ = model_det.module.roi_heads.box_head(box_features_)
+                    predictions = model_det.module.roi_heads.box_predictor(box_features_)
+                    pred_instances = model_det.module.roi_heads.box_predictor.inference(predictions,proposals)
+                else:
+                    box_features_ = model_det.roi_heads.box_head(box_features_)
+                    predictions = model_det.roi_heads.box_predictor(box_features_)
+                    pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
+                
+                scores=[]
 
-        #TODO: select target mask and update netG
-        def select_mask(max_scores):
-            '''
-                max_scores: list(np.array(batchsize,1))        
-            '''
-            if cfg_det.NET_G.UPDATE_MODE == 'icassp':
-                return np.argmax(max_scores)
-            elif cfg_det.NET_G.UPDATE_MODE == 'minmax':
-                max_scores = [np.max(it) for it in max_scores]
-                return np.argmin(max_scores)
-            elif cfg_det.NET_G.UPDATE_MODE == 'minmin':
-                min_score = [np.min(it) for it in max_scores]
-                return np.argmin(min_score)
-            elif cfg_det.NET_G.UPDATE_MODE == 'minmean':
-                mean_score = [np.mean(it) for it in max_scores]
-                return np.argmin(mean_score)
-            elif cfg_det.NET_G.UPDATE_MODE == 'confuse':
-                confuse = [np.abs(np.array(it)-0.5).mean() for it in max_scores]
-                return np.argmin(confuse)
-            else:
-                raise NotImplementedError
+                for it in pred_instances[0]:
+                    if len(it.scores) == 0: #TODO: no such field
+                        scores.append(torch.tensor(0,dtype=box_features_.dtype))
+                    elif cfg_det.NET_G.UPDATE_MODE=='confuse':
+                        idx = torch.argmin(torch.abs(it.scores-0.5))
+                        scores.append(it.scores[idx].cpu())
+                    else:
+                        scores.append(it.scores.max().cpu()) #batchsize * 1
+        max_scores.append(scores)
+        masks_pert.append(mask_)
 
-        idx = select_mask(max_scores)
-        mask_tar = masks_pert[idx]
+    #TODO: select target mask and update netG
+    def select_mask(max_scores):
+        '''
+            max_scores: list(np.array(batchsize,1))        
+        '''
+        if cfg_det.NET_G.UPDATE_MODE == 'icassp':
+            return np.argmax(max_scores)
+        elif cfg_det.NET_G.UPDATE_MODE == 'minmax':
+            max_scores = [np.max(it) for it in max_scores]
+            return np.argmin(max_scores)
+        elif cfg_det.NET_G.UPDATE_MODE == 'minmin':
+            min_score = [np.min(it) for it in max_scores]
+            return np.argmin(min_score)
+        elif cfg_det.NET_G.UPDATE_MODE == 'minmean':
+            mean_score = [np.mean(it) for it in max_scores]
+            return np.argmin(mean_score)
+        elif cfg_det.NET_G.UPDATE_MODE == 'confuse':
+            confuse = [np.abs(np.array(it)-0.5).mean() for it in max_scores]
+            return np.argmin(confuse)
+        else:
+            raise NotImplementedError
 
-        del masks_pert, max_scores
+    idx = select_mask(max_scores)
+    mask_tar = masks_pert[idx]
 
-        # 'Updating net G ...'
-        model_g.train(True)
+    del masks_pert, max_scores
 
-        with torch.enable_grad():
-            if distributed:
-                mask_pre = model_g.module.netG(box_features)
-            else:
-                mask_pre = model_g.netG(box_features)
-            if cfg_det.NET_G.G_MODE == 'spatial':
-                mask_pre = torch.mean(mask_pre,dim=1,keepdim=True)
-            if cfg_det.NET_G.G_MODE == 'channel':
-                mask_pre = torch.mean(mask_pre,dim=(2,3),keepdim=True)
+    # 'Updating net G ...'
+    model_g.train(True)
 
+    with torch.enable_grad():
+        if distributed:
+            mask_pre = model_g.module.netG(box_features)
+        else:
+            mask_pre = model_g.netG(box_features)
+        if cfg_det.NET_G.G_MODE == 'spatial':
+            mask_pre = torch.mean(mask_pre,dim=1,keepdim=True)
+        if cfg_det.NET_G.G_MODE == 'channel':
+            mask_pre = torch.mean(mask_pre,dim=(2,3),keepdim=True)
+    if False and (cfg_det.NET_G.VERSION == 'version2' or cfg_det.NET_G.VERSION == 'version3'):
+        loss = nn.BCELoss()(mask_pre, mask_tar)
+    else:
         loss = nn.L1Loss()(mask_pre,mask_tar)
 
-        return {'loss_g':loss}
+    return {'loss_g':loss}
+    
+def do_update_g(model_det, model_g, cfg_det, data):
+    if cfg_det.NET_G.DROP_MODE == 'selective':
+        return do_update_g_sel(model_det, model_g, cfg_det, data)
+    distributed = comm.get_world_size() > 1
+    if "instances" in data[0]:
+        gt_instances = [x["instances"].to(model_det.device) for x in data]
+    else:
+        gt_instances = None
+    if distributed:
+        images = model_det.module.preprocess_image(data)
+        with torch.no_grad():
+            features_orig = model_det.module.backbone(images.tensor)
+            proposals, _ = model_det.module.proposal_generator(images, features_orig, None)
+            proposals = model_det.module.roi_heads.label_and_sample_proposals(proposals, gt_instances)
+            features = [features_orig[f] for f in model_det.module.roi_heads.box_in_features]
+            box_features = model_det.module.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
+    else:
+        images = model_det.preprocess_image(data)
+        with torch.no_grad():
+            features_orig = model_det.backbone(images.tensor)
+            proposals, _ = model_det.proposal_generator(images, features_orig, None)
+            proposals = model_det.roi_heads.label_and_sample_proposals(proposals, gt_instances)
+            features = [features_orig[f] for f in model_det.roi_heads.box_in_features]
+            box_features = model_det.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])
+    
+    model_g.eval()
+    with torch.no_grad():
+        mask = model_g(box_features)
+        if cfg_det.NET_G.VERSION == 'version3':
+            _,idx=mask.reshape(mask.size(0),-1).topk(dim=1,k=int(0.1*mask.numel()/mask.size(0)),largest=False)
+            mask = torch.ones_like(mask)
+            for i in range(idx.size(0)):
+                idx_ = np.unravel_index(idx[i].cpu(),mask[0].cpu().shape)
+                mask[i][idx_] = 0
         
+    #random perturbation on mask
+    masks_pert=[]
+    max_scores=[]
+    num_instances=[]
+    if cfg_det.NET_G.DROP_MODE=='anywhere':
+        total_num = int(mask.numel()/mask.size(0))
+        num_drop = int (total_num * cfg_det.NET_G.DROP)
+    elif cfg_det.NET_G.DROP_MODE=='spatial':
+        total_num = int(mask.size(2)*mask.size(3))
+        num_drop = int (total_num * cfg_det.NET_G.DROP)
+    elif cfg_det.NET_G.DROP_MODE=='channel':
+        total_num = int(mask.size(1))
+        num_drop = int(total_num * cfg_det.NET_G.DROP)
+    else:
+        raise NotImplementedError('NET_G.DROP_MODE: {} not implemented.'.format(cfg_det.NET_G.DROP_MODE))
+    
+    for i in range(9):
+        drop_idxes = list(range(total_num))
+        random.shuffle(drop_idxes)
+        drop_idxes = drop_idxes[:num_drop]
+        mask_ = mask.clone()
+        if cfg_det.NET_G.DROP_MODE=='anywhere':
+            c_idx,x_idx,y_idx = np.unravel_index(drop_idxes,mask[0].shape)
+            mask_[:,c_idx,x_idx,y_idx] = 0
+        elif cfg_det.NET_G.DROP_MODE=='spatial':
+            x_idx,y_idx = np.unravel_index(drop_idxes,(mask.size(2),mask.size(3)))
+            mask_[:,:,x_idx,y_idx] = 0
+        elif cfg_det.NET_G.DROP_MODE=='channel':
+            c_idx = drop_idxes
+            mask_[:,c_idx,:,:] = 0
+        else:
+            raise NotImplementedError('NET_G.DROP_MODE: {} not implemented.'.format(cfg_det.NET_G.DROP_MODE))
+            
+            
+        if cfg_det.NET_G.G_MODE == 'spatial':
+            mask_ = torch.mean(mask_,dim=1,keepdim=True)
+        if cfg_det.NET_G.G_MODE == 'channel':
+            mask_ = torch.mean(mask_,dim=(2,3),keepdim=True)
+        if cfg_det.NET_G.MASK_CLIP and cfg_det.NET_G.VERSION != 'version2':
+            mask_[mask_>1]=1    
+        #embed()
+        #mask_ = mask.clone()
+        #mask_[:,c_idx,x_idx,y_idx] = 0
+
+        with torch.no_grad():
+            if cfg_det.NET_G.UPDATE_MODE == 'icassp' or cfg_det.NET_G.UPDATE_MODE == 'loss-cls':
+                model_det.train()
+                if distributed:
+                    _, detector_loss_g = model_det.module.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
+                else:
+                    _, detector_loss_g = model_det.roi_heads(images,features_orig,proposals,gt_instances,model_g,mask_)
+                if cfg_det.NET_G.UPDATE_MODE == 'loss-cls':
+                    scores=detector_loss_g['loss_cls'].cpu()
+                else:
+                    scores=sum(detector_loss_g.values()).cpu()
+                model_det.eval()
+            else: 
+                if cfg_det.NET_G.MASK_TYPE == 'icassp':
+                    box_features_ = box_features * mask_
+                elif cfg_det.NET_G.MASK_TYPE == 'residual':
+                    box_features_ = box_features + mask_
+                else:
+                    raise NotImplementedError
+                
+                if distributed:
+                    box_features_ = model_det.module.roi_heads.box_head(box_features_)
+                    predictions = model_det.module.roi_heads.box_predictor(box_features_)
+                    pred_instances = model_det.module.roi_heads.box_predictor.inference(predictions,proposals)
+                else:
+                    box_features_ = model_det.roi_heads.box_head(box_features_)
+                    predictions = model_det.roi_heads.box_predictor(box_features_)
+                    pred_instances = model_det.roi_heads.box_predictor.inference(predictions,proposals)
+                
+                scores=[]
+
+                for it in pred_instances[0]:
+                    if len(it.scores) == 0: #TODO: no such field
+                        scores.append(torch.tensor(0,dtype=box_features_.dtype))
+                    elif cfg_det.NET_G.UPDATE_MODE=='confuse':
+                        idx = torch.argmin(torch.abs(it.scores-0.5))
+                        scores.append(it.scores[idx].cpu())
+                    else:
+                        scores.append(it.scores.max().cpu()) #batchsize * 1
+        
+        max_scores.append(scores)
+        masks_pert.append(mask_)
+
+    #TODO: select target mask and update netG
+    def select_mask(max_scores):
+        '''
+            max_scores: list(np.array(batchsize,1))        
+        '''
+        if cfg_det.NET_G.UPDATE_MODE == 'icassp':
+            return np.argmax(max_scores)
+        elif cfg_det.NET_G.UPDATE_MODE == 'minmax':
+            max_scores = [np.max(it) for it in max_scores]
+            return np.argmin(max_scores)
+        elif cfg_det.NET_G.UPDATE_MODE == 'minmin':
+            min_score = [np.min(it) for it in max_scores]
+            return np.argmin(min_score)
+        elif cfg_det.NET_G.UPDATE_MODE == 'minmean':
+            mean_score = [np.mean(it) for it in max_scores]
+            return np.argmin(mean_score)
+        elif cfg_det.NET_G.UPDATE_MODE == 'confuse':
+            confuse = [np.abs(np.array(it)-0.5).mean() for it in max_scores]
+            return np.argmin(confuse)
+        else:
+            raise NotImplementedError
+
+    idx = select_mask(max_scores)
+    mask_tar = masks_pert[idx]
+
+    del masks_pert, max_scores
+
+    # 'Updating net G ...'
+    model_g.train(True)
+
+    with torch.enable_grad():
+        if distributed:
+            mask_pre = model_g.module.netG(box_features)
+        else:
+            mask_pre = model_g.netG(box_features)
+        if cfg_det.NET_G.G_MODE == 'spatial':
+            mask_pre = torch.mean(mask_pre,dim=1,keepdim=True)
+        if cfg_det.NET_G.G_MODE == 'channel':
+            mask_pre = torch.mean(mask_pre,dim=(2,3),keepdim=True)
+    if False and cfg_det.NET_G.VERSION == 'version3':
+        loss = nn.BCELoss()(mask_pre, mask_tar)
+    else:
+        loss = nn.L1Loss()(mask_pre,mask_tar)
+
+    return {'loss_g':loss}
+    
 
 
 def do_train(cfg_g, model_g, cfg_det, model_det, resume=False):
