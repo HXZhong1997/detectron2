@@ -1,3 +1,50 @@
+# Code for Faster-rcnn of Chap04 of Haoxiang's Thesis 
+
+Based on Detectron2.
+
+
+## Step1: Preparation
+
+Prepare dataset `VOC2007`, `VOC2012`, `OVIS` in `./datasets`
+
+Download [`ovis_occlusion_no2severe.json`](https://pan.quark.cn/s/6cde99d07622) to `./datasets/OVIS`
+
+Download [`output/faster-rcnn/model_final.pth`](https://pan.quark.cn/s/6cde99d07622) and put it at that path.
+
+Prepare the environment as in [README of Detectron](#below-are-the-original-readme-file-of-detecron2)
+
+## Step2: Train mask generation network (net g).
+
+```
+python tools/plain_train_G.py \
+--config-file configs/Net-G-no2severe.yaml \
+--config-det configs/COCO-Detection/faster_rcnn_R_50_FPN_1x_trained.yaml \
+--num-gpus 2 \
+OUTPUT_DIR output/netG_lr1e-2-no2svr
+```
+
+## Step3: Train Faster RCNN with net g together with the update strategy
+
+```
+python tools/plain_train_net_wG.py \
+--config-file configs/faster-rcnn-g/Net-G-lr1e-2-no2svr.yaml \
+--config-det configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN.yaml \
+--num-gpus 4 \
+OUTPUT_DIR output/voc/fasterrcnn-glr1e_2-no2svr-ui20x5-d3-icassp-gs005-clip \
+NET_G.INTERVAL 20 \
+NET_G.START_ITER 10000 \
+NET_G.UPDATE_START 10000 \
+NET_G.UPDATE_INTERVAL 20 \
+NET_G.UPDATE_MODE 'icassp' \
+NET_G.ONLY_G True \
+NET_G.UPDATE_TIMES 5 \
+NET_G.DROP 0.3 \
+NET_G.MASK_CLIP True \
+NET_G.G_STEP 0.05 
+```
+
+## Below are the original README file of Detecron2
+
 <img src=".github/Detectron2-Logo-Horz.svg" width="300" >
 
 Detectron2 is Facebook AI Research's next generation library
