@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
+from distutils.archive_util import make_archive
 import inspect
 import logging
 from random import random
@@ -559,6 +560,7 @@ class StandardROIHeads_NetG(ROIHeads):
         only_g: Optional[bool] = False,
         mask_clip: Optional[bool] = False,
         g_mode: Optional[str] = 'any',
+        version: Optional[str] = 'v1',
         **kwargs,
     ):
         """
@@ -605,6 +607,7 @@ class StandardROIHeads_NetG(ROIHeads):
         self.only_g = only_g
         self.mask_clip = mask_clip
         self.g_mode = g_mode
+        self.version = version
 
 
     @classmethod
@@ -626,6 +629,7 @@ class StandardROIHeads_NetG(ROIHeads):
         ret["only_g"] = cfg.NET_G.ONLY_G
         ret["mask_clip"] = cfg.NET_G.MASK_CLIP
         ret["g_mode"]=cfg.NET_G.G_MODE
+        ret["version"]=cfg.NET_G.VERSION
         return ret
 
     @classmethod
@@ -812,7 +816,6 @@ class StandardROIHeads_NetG(ROIHeads):
         """
         features = [features[f] for f in self.box_in_features]
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
-
         if self.training and netG is not None:
             if mask is None and self.mask_type != 'random' and self.mask_type != 'gaussian':
                 with torch.no_grad():
@@ -821,22 +824,29 @@ class StandardROIHeads_NetG(ROIHeads):
                     mask = torch.mean(mask,dim=1,keepdim=True)
                 if self.g_mode=='channel':
                     mask = torch.mean(mask,dim=(2,3),keepdim=True)
-                if self.mask_clip:
+                if self.mask_clip and self.version!='version2':
                     mask[mask>1]=1
+                if self.version == 'version3':
+                    _,idx=mask.reshape(mask.size(0),-1).topk(dim=1,k=int(0.1*mask.numel()/mask.size(0)),largest=False)
+                    mask = torch.ones_like(mask)
+                    for i in range(idx.size(0)):
+                        idx_ = np.unravel_index(idx[i].cpu(),mask[0].cpu().shape)
+                        mask[i][idx_] = 0
+
             if self.mask_type == 'icassp':
                 box_features_g = box_features*mask
             elif self.mask_type == 'residual':
                 box_features_g = box_features+mask
             elif self.mask_type == 'gaussian':
                 mask = torch.randn_like(box_features[0])
-                box_features_g = box_features * (mask.unsqueeze(dim=-1))
+                box_features_g = box_features * (mask.unsqueeze(dim=0))
             elif self.mask_type == 'random':
                 drop_idxes = np.random.permutation(box_features[0].numel())
                 drop_idxes = drop_idxes[:int(0.3*len(drop_idxes))]
                 c_,x_,y_=np.unravel_index(drop_idxes,box_features[0].shape)
                 mask = torch.ones_like(box_features[0])
                 mask[c_,x_,y_] = 0
-                box_features_g = box_features * (mask.unsqueeze(dim=-1))
+                box_features_g = box_features * (mask.unsqueeze(dim=0))
             else:
                 raise NotImplementedError
             

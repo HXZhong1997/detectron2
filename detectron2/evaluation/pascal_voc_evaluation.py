@@ -49,6 +49,7 @@ class PascalVOCDetectionEvaluator(DatasetEvaluator):
         self._logger = logging.getLogger(__name__)
         
         self.split_image_set_path = {
+            'test_10more': os.path.join(meta.dirname, "ImageSets", "Main", "test_10more.txt"),
             'test_20plus': os.path.join(meta.dirname, "ImageSets", "Main", "test_20plus.txt"),
             'test_10plus': os.path.join(meta.dirname, "ImageSets", "Main", "test_10plus.txt"),
             'test_5plus': os.path.join(meta.dirname, "ImageSets", "Main", "test_5plus.txt"),

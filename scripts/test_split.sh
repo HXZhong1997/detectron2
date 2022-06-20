@@ -1,0 +1,1 @@
+python tools/plain_train_net.py --config-file configs/faster-rcnn-g/voc_faster_rcnn_R_50_FPN_B8.yaml --eval-only --split MODEL.WEIGHTS output/voc/fasterrcnn-glr1e_2-no2svr-ui10x4-d3sp-icassp-gs005-clip/model_final.pth
